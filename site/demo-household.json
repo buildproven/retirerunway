@@ -1,0 +1,239 @@
+{
+  "note": "An invented household. Every figure on retirerunway.buildproven.ai comes from RetireRunway 1.0.1 run on these inputs with seed 42 and asOfDate 2026-11-23. Pass portfolio and profile (and asOfDate where a tool takes it) to the tools named below to get the same results and hashes.",
+  "asOfDate": "2026-11-23",
+  "seed": 42,
+  "portfolio": {
+    "id": "demo",
+    "name": "Jordan and Sam (invented)",
+    "asOfDate": "2026-11-23",
+    "accounts": [
+      {
+        "id": "k",
+        "name": "Workplace 401(k)",
+        "institution": "Demo",
+        "accountType": "401k",
+        "cashBalance": 20000,
+        "cds": [],
+        "holdings": [
+          {
+            "id": "k1",
+            "symbol": "VTI",
+            "name": "VTI",
+            "assetClass": "us_equity",
+            "shares": 5600,
+            "costBasis": 400000,
+            "currentPrice": 100,
+            "currentValue": 560000
+          },
+          {
+            "id": "k2",
+            "symbol": "VXUS",
+            "name": "VXUS",
+            "assetClass": "intl_equity",
+            "shares": 1400,
+            "costBasis": 120000,
+            "currentPrice": 100,
+            "currentValue": 140000
+          },
+          {
+            "id": "k3",
+            "symbol": "BND",
+            "name": "BND",
+            "assetClass": "us_bond",
+            "shares": 1800,
+            "costBasis": 180000,
+            "currentPrice": 100,
+            "currentValue": 180000
+          }
+        ]
+      },
+      {
+        "id": "r",
+        "name": "Roth IRA",
+        "institution": "Demo",
+        "accountType": "roth_ira",
+        "cashBalance": 0,
+        "cds": [],
+        "holdings": [
+          {
+            "id": "r1",
+            "symbol": "VTI",
+            "name": "VTI",
+            "assetClass": "us_equity",
+            "shares": 1100,
+            "costBasis": 60000,
+            "currentPrice": 100,
+            "currentValue": 110000
+          }
+        ]
+      },
+      {
+        "id": "t",
+        "name": "Joint brokerage",
+        "institution": "Demo",
+        "accountType": "brokerage",
+        "cashBalance": 45000,
+        "cds": [],
+        "holdings": [
+          {
+            "id": "t1",
+            "symbol": "VTI",
+            "name": "VTI",
+            "assetClass": "us_equity",
+            "shares": 1500,
+            "costBasis": 90000,
+            "currentPrice": 100,
+            "currentValue": 150000
+          },
+          {
+            "id": "t2",
+            "symbol": "VGSH",
+            "name": "VGSH",
+            "assetClass": "us_bond",
+            "shares": 400,
+            "costBasis": 40000,
+            "currentPrice": 100,
+            "currentValue": 40000
+          }
+        ]
+      }
+    ]
+  },
+  "profile": {
+    "currentAge": 57,
+    "targetRetirementAge": 60,
+    "annualExpenses": 90000,
+    "socialSecurityAge": 67,
+    "socialSecurityMonthly": 3200,
+    "socialSecurityCola": true,
+    "spouse": {
+      "currentAge": 56,
+      "socialSecurityAge": 67,
+      "socialSecurityMonthly": 1900
+    },
+    "stateTaxRate": 0.04,
+    "annualContributions": 35000,
+    "separationAge": 60,
+    "preMedicareHealthcare": 26000,
+    "acaPremiumTaxCredit": true,
+    "planningAge": 95,
+    "planRules": {
+      "targetEquityShare": 0.6,
+      "driftBand": 0.05,
+      "minCashBufferYears": 1,
+      "sellSchedule": [
+        {
+          "id": "trim-1",
+          "dueDate": "2026-11-20",
+          "symbol": "VTI",
+          "amount": 40000,
+          "accountType": "401k"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "ladder",
+          "dueDate": "2026-12-10",
+          "action": "Move the trim proceeds into a 2027-2029 Treasury ladder"
+        }
+      ]
+    }
+  },
+  "results": {
+    "plan_verdict": {
+      "verdict": "DELAY",
+      "measures": {
+        "successRate": 0.494,
+        "forecastSuccessRate": 0.324,
+        "historicalSuccessRate": 0.8776,
+        "historicalUnwrappedSuccessRate": 0.8254,
+        "plannedMonthlySpending": 7500,
+        "canSpendMonthly": 6455.84,
+        "cutAtPortfolioValue": 1046897,
+        "planStatus": "action_needed"
+      },
+      "inputHash": "sha256:efc0d51a725a4b2eb366baeaf25fcee8eca79f0e26cba572130e7d2947252b04",
+      "outputHash": "sha256:2506cab50be20122a0c5fe66d83574ff3ab5cc78b939e0d0acfc9da8f3cc3c71"
+    },
+    "compare_retirement_scenarios": {
+      "scenarios": [
+        {
+          "name": "Retire at 62",
+          "changes": {
+            "targetRetirementAge": 62,
+            "separationAge": 62
+          }
+        },
+        {
+          "name": "Spend $6,500/mo",
+          "changes": {
+            "annualExpenses": 78000
+          }
+        }
+      ],
+      "successRates": {
+        "Current plan": 0.494,
+        "Retire at 62": 0.744,
+        "Spend $6,500/mo": 0.838
+      },
+      "inputHash": "sha256:401b15b0f846763bea7a10779a25caa797a7f2d40cdd578f176b0ebdb96e476b",
+      "outputHash": "sha256:b3c8c783ac2e3f7117b284e6b1f91826eb8f0174c8f821f3c3a44fd765969bf5"
+    },
+    "plan_check": {
+      "headline": "Action needed: Sell $40,000 VTI in Workplace 401(k), into cash or your CD rungs (trim-1, 3 days overdue).",
+      "recommendations": [
+        "Sell $40,000 VTI in Workplace 401(k), into cash or your CD rungs (trim-1, 3 days overdue).",
+        "Sell $173,000 of stocks (VTI) in Workplace 401(k), into cash or bonds.",
+        "Build $45,000 of liquid cash outside retirement accounts (savings, money market or Treasuries in a taxable account)."
+      ],
+      "inputHash": "sha256:4b0b174f10d5c38e57f3c7abc09c27f1a4561f09189a0a0f812fe377e9c8fdf0",
+      "outputHash": "sha256:b51aec6723d84a1c35edd337a07dd97dd48d1211cf811c2c37ca8e2c5160db0d"
+    },
+    "project_retirement": {
+      "balanceByAge": {
+        "title": "Total savings by age (today\u2019s dollars)",
+        "style": "line",
+        "xLabel": "Age",
+        "yLabel": "Today\u2019s dollars",
+        "x": [
+          58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
+          75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91,
+          92, 93, 94, 95
+        ],
+        "series": [
+          {
+            "name": "Poor markets (10th percentile)",
+            "values": [
+              1123749, 1091388, 961307, 856096, 738988, 622976, 477618, 363905,
+              252932, 205915, 168047, 137336, 98668, 70675, 41345, 9155, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+          },
+          {
+            "name": "Typical (median)",
+            "values": [
+              1321494, 1382615, 1330243, 1261775, 1189224, 1056044, 952162,
+              854378, 768805, 725757, 701540, 682646, 664247, 634187, 615439,
+              588831, 565262, 535730, 524271, 497341, 462956, 450234, 425190,
+              393301, 356161, 328746, 302552, 267744, 246719, 206330, 193335,
+              169696, 131106, 102377, 75407, 41282, 9925, 0
+            ]
+          },
+          {
+            "name": "Strong markets (90th percentile)",
+            "values": [
+              1531211, 1701075, 1718715, 1774868, 1774305, 1752301, 1675421,
+              1620375, 1559542, 1564882, 1576101, 1625452, 1618586, 1631194,
+              1685491, 1701049, 1732381, 1743526, 1789656, 1786461, 1776215,
+              1751362, 1780627, 1873428, 1861644, 1858516, 1874460, 1880483,
+              1906340, 1957283, 1904603, 1991405, 1977023, 2052031, 2098551,
+              2087667, 2095226, 2054368
+            ]
+          }
+        ]
+      },
+      "inputHash": "sha256:5104c217fe5586188ee5729322396a77989ab7d24d530274354a62e06e3f6f11",
+      "outputHash": "sha256:7147e91a16cb0d1fd665675dc3024c86707f7e3af00df5c17bc89ef3bc5937cf"
+    }
+  }
+}

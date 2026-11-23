@@ -1,0 +1,13 @@
+{
+  "name": "retire-runway",
+  "version": "1.0.1",
+  "description": "Deterministic retirement planning from your saved data: plans, Monte Carlo, portfolio risk, tax strategy and trade plans, computed by a tested engine.",
+  "author": {
+    "name": "BuildProven"
+  },
+  "homepage": "https://retirerunway.buildproven.ai",
+  "repository": "https://github.com/buildproven/retirerunway",
+  "license": "MIT",
+  "privacyPolicyUrl": "https://retirerunway.buildproven.ai/#privacy",
+  "keywords": ["retirement", "monte-carlo", "roth", "portfolio", "planning"]
+}

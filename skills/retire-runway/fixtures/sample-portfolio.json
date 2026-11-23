@@ -1,0 +1,109 @@
+{
+  "portfolio": {
+    "id": "sample-001",
+    "name": "Sample Pre-Retiree Portfolio",
+    "asOfDate": "2026-04-18",
+    "accounts": [
+      {
+        "id": "acct-401k",
+        "name": "Employer 401k",
+        "institution": "Fidelity",
+        "accountType": "401k",
+        "cashBalance": 5000,
+        "cds": [],
+        "holdings": [
+          {
+            "id": "h1",
+            "symbol": "FXAIX",
+            "name": "Fidelity 500 Index",
+            "assetClass": "us_equity",
+            "shares": 2500,
+            "costBasis": 225000,
+            "currentPrice": 180,
+            "currentValue": 450000
+          },
+          {
+            "id": "h2",
+            "symbol": "FXNAX",
+            "name": "Fidelity US Bond Index",
+            "assetClass": "us_bond",
+            "shares": 4000,
+            "costBasis": 42000,
+            "currentPrice": 10.5,
+            "currentValue": 42000
+          }
+        ]
+      },
+      {
+        "id": "acct-tira",
+        "name": "Traditional IRA",
+        "institution": "Vanguard",
+        "accountType": "traditional_ira",
+        "cashBalance": 2000,
+        "cds": [],
+        "holdings": [
+          {
+            "id": "h3",
+            "symbol": "VTSAX",
+            "name": "Vanguard Total Stock",
+            "assetClass": "us_equity",
+            "shares": 1500,
+            "costBasis": 180000,
+            "currentPrice": 140,
+            "currentValue": 210000
+          }
+        ]
+      },
+      {
+        "id": "acct-roth",
+        "name": "Roth IRA",
+        "institution": "Vanguard",
+        "accountType": "roth_ira",
+        "cashBalance": 1000,
+        "cds": [],
+        "holdings": [
+          {
+            "id": "h4",
+            "symbol": "VTI",
+            "name": "Vanguard Total Stock ETF",
+            "assetClass": "us_equity",
+            "shares": 600,
+            "costBasis": 90000,
+            "currentPrice": 220,
+            "currentValue": 132000
+          }
+        ]
+      },
+      {
+        "id": "acct-taxable",
+        "name": "Taxable Brokerage",
+        "institution": "Schwab",
+        "accountType": "brokerage",
+        "cashBalance": 15000,
+        "cds": [],
+        "holdings": [
+          {
+            "id": "h5",
+            "symbol": "SCHB",
+            "name": "Schwab US Broad Market",
+            "assetClass": "us_equity",
+            "shares": 400,
+            "costBasis": 60000,
+            "currentPrice": 210,
+            "currentValue": 84000
+          },
+          {
+            "id": "h6",
+            "symbol": "SCHZ",
+            "name": "Schwab US Aggregate Bond",
+            "assetClass": "us_bond",
+            "shares": 1200,
+            "costBasis": 60000,
+            "currentPrice": 48,
+            "currentValue": 57600
+          }
+        ]
+      }
+    ]
+  }
+}

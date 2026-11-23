@@ -1,0 +1,9 @@
+{
+  "currentAge": 58,
+  "targetRetirementAge": 62,
+  "annualExpenses": 90000,
+  "socialSecurityAge": 67,
+  "socialSecurityMonthly": 2800,
+  "federalTaxBracket": 0.22,
+  "stateTaxRate": 0.05
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "retire-runway": {
+      "type": "http",
+      "url": "https://retire-runway.vercel.app/api/mcp"
+    }
+  }
+}

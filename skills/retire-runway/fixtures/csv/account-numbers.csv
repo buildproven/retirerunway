@@ -1,0 +1,7 @@
+Account,Symbol,Name,Shares,Price,Value,CostBasis
+Traditional IRA 33333,VTI,Vanguard Total Stock ETF,100,220,22000,18000
+Traditional IRA 44444,BND,Vanguard Total Bond ETF,200,72,14400,15000
+Individual-12345678,VOO,Vanguard S&P 500 ETF,50,420,21000,17000
+Brokerage (...9876),VXUS,Vanguard Total International Stock ETF,100,60,6000,5500
+XXXX-5678,SCHB,Schwab US Broad Market ETF,40,210,8400,7000
+Employer 401k Z55555,FXAIX,Fidelity 500 Index,10,180,1800,1500

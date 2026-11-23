@@ -1,0 +1,12 @@
+{
+  "checks": {
+    "lint": "npm run lint",
+    "typecheck": "npm run type-check",
+    "test": "npx vitest run --reporter=default --coverage=false"
+  },
+  "testCommand": "npx vitest run --reporter=default --coverage=false",
+  "testFilesCommand": "npx vitest run --coverage=false {files}",
+  "linearProject": "retire-runway",
+  "review": true,
+  "install": "npm ci"
+}

@@ -1,0 +1,18 @@
+
+# Run lint-staged on staged files
+npx --no -- lint-staged
+
+# Typecheck the whole project.
+#
+# This deliberately does NOT live in lint-staged: that appends staged filenames
+# to the command, and passing files to tsc makes it ignore tsconfig.json
+# entirely — losing jsx, path aliases and strict mode. Every .tsx commit then
+# failed with spurious TS17004/TS2307 errors. Typecheck is project-wide by
+# nature, so run it once here against the real config.
+npm run type-check
+
+# Defensive pattern analysis on staged files
+if [ -f "./scripts/pattern-check.sh" ]; then
+  echo "Running defensive pattern analysis..."
+  ./scripts/pattern-check.sh
+fi

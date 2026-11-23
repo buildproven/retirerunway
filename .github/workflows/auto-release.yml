@@ -1,0 +1,53 @@
+name: Auto Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (for example v1.2.3)
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    timeout-minutes: 10
+    runs-on: ${{ fromJSON((github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_RUNS_ON || '"ubuntu-latest"') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+
+      - name: Get previous tag
+        id: prev_tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 "${RELEASE_TAG}^" 2>/dev/null || echo "")
+          echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          TAG="$RELEASE_TAG"
+          PREV_TAG=${{ steps.prev_tag.outputs.tag }}
+          if [ -n "$PREV_TAG" ]; then
+            echo "## Changes since $PREV_TAG" > notes.md
+            git log "${PREV_TAG}..${TAG}" --pretty=format:"- %s" >> notes.md
+            echo -e "\n\n**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}" >> notes.md
+          else
+            echo "Initial release" > notes.md
+          fi
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: notes.md
+          tag_name: ${{ inputs.tag }}

@@ -1,0 +1,661 @@
+{
+  "requirements": [
+    {
+      "id": "FR-01",
+      "title": "Plan intake without prefilled values",
+      "status": "implemented",
+      "design": "DESIGN.md §3.1",
+      "code": [
+        "src/engine/plan/intake.ts",
+        "src/components/plan-intake-step.tsx"
+      ],
+      "tests": [
+        "src/engine/plan/__tests__/intake.test.ts",
+        "src/engine/plan/__tests__/intake-snapshot-balances.test.ts",
+        "src/engine/__tests__/nqdc-account.test.ts",
+        "src/components/__tests__/plan-intake-step.behavior.test.tsx"
+      ]
+    },
+    {
+      "id": "FR-02",
+      "title": "Year-by-year projection kernel",
+      "status": "implemented",
+      "design": "DESIGN.md §3.2",
+      "code": ["src/engine/plan/projection.ts", "src/engine/plan/types.ts"],
+      "tests": ["src/engine/plan/__tests__/projection.test.ts"]
+    },
+    {
+      "id": "FR-03",
+      "title": "Account access rules and withdrawal ordering",
+      "status": "implemented",
+      "design": "DESIGN.md §3.2",
+      "code": ["src/engine/plan/projection.ts", "src/engine/rule-of-55.ts"],
+      "tests": [
+        "src/engine/plan/__tests__/projection.test.ts",
+        "src/engine/__tests__/rule-of-55.test.ts",
+        "src/engine/__tests__/nqdc-account.test.ts"
+      ]
+    },
+    {
+      "id": "FR-04",
+      "title": "Tax calculation",
+      "status": "implemented",
+      "design": "DESIGN.md §3.2",
+      "code": ["src/engine/tax-brackets.ts", "src/engine/plan/projection.ts"],
+      "tests": [
+        "src/engine/__tests__/tax-brackets.test.ts",
+        "src/engine/__tests__/nqdc-account.test.ts",
+        "src/engine/plan/__tests__/projection.test.ts"
+      ]
+    },
+    {
+      "id": "FR-05",
+      "title": "Social Security",
+      "status": "implemented",
+      "design": "DESIGN.md §3.2, §4",
+      "code": ["src/engine/plan/social-security.ts"],
+      "tests": ["src/engine/plan/__tests__/social-security.test.ts"]
+    },
+    {
+      "id": "FR-06",
+      "title": "Healthcare and ACA",
+      "status": "implemented",
+      "design": "DESIGN.md §3.2, §4",
+      "code": ["src/engine/plan/healthcare.ts"],
+      "tests": ["src/engine/plan/__tests__/healthcare.test.ts"],
+      "adr": ["ADR-004", "ADR-006"]
+    },
+    {
+      "id": "FR-07",
+      "title": "Deterministic stress suite",
+      "status": "implemented",
+      "design": "DESIGN.md §3.3",
+      "code": ["src/engine/plan/stress-scenarios.ts"],
+      "tests": ["src/engine/plan/__tests__/stress-scenarios.test.ts"]
+    },
+    {
+      "id": "FR-08",
+      "title": "Outcome-based verdict",
+      "status": "implemented",
+      "design": "DESIGN.md §3.4",
+      "code": ["src/engine/plan/verdict.ts", "src/engine/plan/analyze.ts"],
+      "tests": [
+        "src/engine/plan/__tests__/verdict.test.ts",
+        "src/engine/plan/__tests__/analyze.test.ts"
+      ]
+    },
+    {
+      "id": "FR-09",
+      "title": "Minimum outside-income solver",
+      "status": "implemented",
+      "design": "DESIGN.md §3.5",
+      "code": ["src/engine/plan/income-solver.ts"],
+      "tests": ["src/engine/plan/__tests__/income-solver.test.ts"]
+    },
+    {
+      "id": "FR-10",
+      "title": "Housing and life events",
+      "status": "implemented",
+      "design": "DESIGN.md §3.3",
+      "code": [
+        "src/engine/plan/stress-scenarios.ts",
+        "src/engine/plan/projection.ts",
+        "src/engine/plan/intake.ts"
+      ],
+      "tests": [
+        "src/engine/plan/__tests__/stress-scenarios.test.ts",
+        "src/engine/plan/__tests__/projection.test.ts"
+      ]
+    },
+    {
+      "id": "FR-11",
+      "title": "Plan comparison",
+      "status": "implemented",
+      "design": "DESIGN.md §3.6",
+      "code": [
+        "src/engine/plan/analysis-delta.ts",
+        "src/components/plan-results-step.tsx"
+      ],
+      "tests": [
+        "src/engine/plan/__tests__/analysis-delta.test.ts",
+        "src/components/__tests__/plan-results-step.behavior.test.tsx"
+      ]
+    },
+    {
+      "id": "FR-12",
+      "title": "Regression fixtures",
+      "status": "implemented",
+      "design": "DESIGN.md §3.7",
+      "code": ["src/engine/plan/regression-fixtures.ts"],
+      "tests": ["src/engine/plan/__tests__/regression-fixtures.test.ts"]
+    },
+    {
+      "id": "FR-13",
+      "title": "Portfolio import",
+      "status": "implemented",
+      "design": "DESIGN.md §6",
+      "code": [
+        "src/engine/csv-parser.ts",
+        "src/engine/plaid-mapper.ts",
+        "src/engine/stable-id.ts",
+        "src/components/upload-step.tsx",
+        "src/components/manual-entry-form.tsx",
+        "src/app/api/plaid"
+      ],
+      "tests": [
+        "src/engine/__tests__/csv-parser.test.ts",
+        "src/engine/__tests__/csv-parser-preamble.test.ts",
+        "src/engine/__tests__/csv-asset-class.test.ts",
+        "src/engine/__tests__/nqdc-account.test.ts",
+        "src/engine/__tests__/plaid-mapper.test.ts",
+        "src/engine/__tests__/stable-id.test.ts",
+        "src/components/__tests__/upload-step.behavior.test.tsx",
+        "src/app/api/plaid/__tests__/auth-boundary.test.ts"
+      ]
+    },
+    {
+      "id": "FR-14",
+      "title": "Portfolio analysis tools",
+      "status": "implemented",
+      "design": "DESIGN.md §1",
+      "code": [
+        "src/engine/scenarios.ts",
+        "src/engine/monte-carlo.ts",
+        "src/engine/monte-carlo.worker.ts",
+        "src/engine/portfolio-math.ts",
+        "src/engine/config.ts",
+        "src/engine/risk-scoring.ts",
+        "src/engine/trade-plan.ts",
+        "src/engine/cd-analysis.ts",
+        "src/engine/ladder-plan.ts",
+        "src/engine/roth-conversion.ts",
+        "src/engine/household.ts",
+        "src/engine/alerts.ts",
+        "src/engine/types.ts",
+        "src/services",
+        "src/hooks/use-monte-carlo-worker.ts",
+        "src/components/results-step.tsx",
+        "src/components/dashboard-step.tsx",
+        "src/components/profile-step.tsx",
+        "src/engine/stats.ts"
+      ],
+      "tests": [
+        "src/engine/__tests__/scenarios.test.ts",
+        "src/engine/__tests__/monte-carlo.test.ts",
+        "src/engine/__tests__/monte-carlo-worker-parity.test.ts",
+        "src/engine/__tests__/risk-scoring.test.ts",
+        "src/engine/__tests__/trade-plan.test.ts",
+        "src/engine/__tests__/minimal-trade.test.ts",
+        "src/engine/__tests__/cd-analysis.test.ts",
+        "src/engine/__tests__/ladder-plan.test.ts",
+        "src/engine/__tests__/roth-conversion.test.ts",
+        "src/engine/__tests__/nqdc-account.test.ts",
+        "src/engine/__tests__/household.test.ts",
+        "src/engine/__tests__/household-survivor.test.ts",
+        "src/engine/__tests__/alerts.test.ts",
+        "src/engine/__tests__/alerts-determinism.test.ts",
+        "src/engine/__tests__/income-gating.test.ts",
+        "src/engine/__tests__/cash-flows.test.ts",
+        "src/services/__tests__/service-boundaries.test.ts",
+        "tests/unit/engine/types.test.ts",
+        "src/components/__tests__/profile-step.behavior.test.tsx"
+      ]
+    },
+    {
+      "id": "FR-15",
+      "title": "AI narration (BYOK)",
+      "status": "implemented",
+      "design": "DESIGN.md §2, §6",
+      "code": [
+        "src/ai",
+        "src/app/api/narrate",
+        "src/app/api/what-if",
+        "src/store/api-key-store.ts",
+        "src/components/narration-card.tsx",
+        "src/components/what-if-card.tsx"
+      ],
+      "tests": [
+        "src/app/api/narrate/__tests__/route.test.ts",
+        "src/app/api/what-if/__tests__/route.test.ts"
+      ]
+    },
+    {
+      "id": "FR-16",
+      "title": "Reports",
+      "status": "implemented",
+      "design": "DESIGN.md §5",
+      "code": ["src/engine/report-generator.ts"],
+      "tests": ["src/engine/__tests__/report-generator.test.ts"]
+    },
+    {
+      "id": "FR-17",
+      "title": "Optional persistence and sync",
+      "status": "implemented",
+      "design": "DESIGN.md §6",
+      "code": [
+        "src/lib/supabase",
+        "src/store/portfolio-store.ts",
+        "src/store/saved-scenarios-store.ts",
+        "src/store/auth-store.ts",
+        "src/hooks/use-portfolio-persistence.ts",
+        "src/components/portfolio-persistence.tsx",
+        "src/components/portfolio-persistence-provider.tsx",
+        "src/components/auth-card.tsx",
+        "src/components/auth-listener.tsx",
+        "src/components/sync-status-indicator.tsx",
+        "supabase/migrations/20260131_create_portfolios.sql",
+        "src/app/api/auth",
+        "src/lib/email.ts",
+        "src/app/api/email",
+        "src/emails"
+      ],
+      "tests": [
+        "src/lib/supabase/__tests__/portfolio-service.test.ts",
+        "tests/unit/store/portfolio-store.test.ts",
+        "src/components/__tests__/auth-config.behavior.test.tsx",
+        "src/app/api/auth/webhook/__tests__/route.test.ts",
+        "src/app/api/email/send-onboarding/__tests__/route.test.ts"
+      ],
+      "adr": ["ADR-005"]
+    },
+    {
+      "id": "FR-18",
+      "title": "Public API v1",
+      "status": "implemented",
+      "design": "DESIGN.md §2",
+      "code": ["src/app/api/v1", "src/lib/api-key-auth.ts"],
+      "tests": [
+        "src/app/api/v1/analyze/__tests__/route.test.ts",
+        "src/app/api/v1/tax/__tests__/route.test.ts",
+        "src/lib/__tests__/api-key-auth.test.ts"
+      ]
+    },
+    {
+      "id": "FR-19",
+      "title": "Agent skill",
+      "status": "implemented",
+      "design": "DESIGN.md §2",
+      "code": ["skills/retire-runway/scripts", "skills/retire-runway/SKILL.md"],
+      "tests": [
+        "skills/retire-runway/scripts/__tests__/bundle-once.test.ts",
+        "skills/retire-runway/scripts/__tests__/correctness.test.ts",
+        "skills/retire-runway/scripts/__tests__/load-portfolio-as-of.test.ts",
+        "skills/retire-runway/scripts/__tests__/provenance.test.ts",
+        "skills/retire-runway/scripts/__tests__/skill.test.ts"
+      ]
+    },
+    {
+      "id": "FR-20",
+      "title": "Marketing, legal and trust pages",
+      "status": "implemented",
+      "design": "DESIGN.md §7",
+      "code": [
+        "src/app/page.tsx",
+        "src/app/about",
+        "src/app/faq",
+        "src/app/features",
+        "src/app/pricing",
+        "src/app/privacy",
+        "src/app/terms",
+        "src/components/landing-hero.tsx",
+        "src/components/marketing-layout.tsx",
+        "src/components/financial-disclaimer.tsx",
+        "src/lib/utils.ts"
+      ],
+      "tests": ["src/app/__tests__/marketing-claims.test.ts"]
+    },
+    {
+      "id": "FR-21",
+      "title": "Plan outputs: bridge, milestones, lifetime chart, export",
+      "status": "implemented",
+      "design": "DESIGN.md §3",
+      "code": [
+        "src/engine/plan/summary.ts",
+        "src/components/plan-lifetime-chart.tsx",
+        "src/components/plan-results-step.tsx"
+      ],
+      "tests": [
+        "src/engine/plan/__tests__/summary.test.ts",
+        "src/components/__tests__/plan-results-step.behavior.test.tsx"
+      ]
+    },
+    {
+      "id": "FR-22",
+      "title": "Plan Monte Carlo (chance of success)",
+      "status": "implemented",
+      "design": "DESIGN.md §3",
+      "code": [
+        "src/engine/plan/monte-carlo.ts",
+        "src/engine/plan/monte-carlo.worker.ts",
+        "src/hooks/use-plan-monte-carlo-worker.ts",
+        "src/components/plan-monte-carlo-card.tsx",
+        "src/engine/stats.ts"
+      ],
+      "tests": [
+        "src/engine/plan/__tests__/monte-carlo.test.ts",
+        "src/components/__tests__/plan-monte-carlo-card.test.tsx"
+      ]
+    },
+    {
+      "id": "FR-23",
+      "title": "Plan MCP server",
+      "status": "implemented",
+      "design": "DESIGN.md §2",
+      "code": [
+        "src/mcp/server.ts",
+        "src/mcp/schemas.ts",
+        "src/mcp/main.ts",
+        "src/mcp/run.mjs",
+        "src/mcp/bundle.mjs",
+        "src/mcp/portfolio-tools.ts",
+        "src/mcp/result.ts",
+        "src/mcp/user-store.ts",
+        "src/mcp/user-data-tools.ts",
+        "src/mcp/instructions.ts",
+        "src/mcp/plan-notes.ts",
+        "src/mcp/git-store.ts",
+        "src/mcp/github-app-token.ts",
+        ".claude-plugin/plugin.json",
+        ".mcp.json",
+        "skills/retire-runway/SKILL.md",
+        "src/mcp/http-auth.ts",
+        "src/app/api/mcp/route.ts",
+        "src/app/.well-known/oauth-protected-resource/route.ts",
+        "src/mcp/oauth-server.ts",
+        "src/app/.well-known/oauth-authorization-server/route.ts",
+        "src/app/oauth/authorize/route.ts",
+        "src/app/oauth/github/callback/route.ts",
+        "src/app/oauth/jwks/route.ts",
+        "src/app/oauth/register/route.ts",
+        "src/app/oauth/token/route.ts",
+        "src/engine/retirement-projection.ts",
+        "src/engine/scenario-comparison.ts",
+        "src/engine/irmaa.ts",
+        "src/engine/plan-check.ts",
+        "src/engine/change-explainer.ts",
+        "src/engine/plan-verdict.ts",
+        "src/engine/market-assumptions.ts",
+        "src/engine/social-security.ts",
+        "src/engine/claiming-explorer.ts",
+        "src/engine/historical-backtest.ts",
+        "src/engine/data/market-history.ts",
+        "src/engine/spending-guardrails.ts",
+        "src/engine/roth-conversion-explorer.ts"
+      ],
+      "tests": [
+        "src/mcp/__tests__/server.test.ts",
+        "src/mcp/__tests__/bundle.test.ts",
+        "src/mcp/__tests__/portfolio-tools.test.ts",
+        "src/mcp/__tests__/profile-store.test.ts",
+        "src/mcp/__tests__/store-contract.test.ts",
+        "src/mcp/__tests__/briefing.test.ts",
+        "src/mcp/__tests__/plan-notes.test.ts",
+        "src/mcp/__tests__/sectioned-briefing.test.ts",
+        "src/mcp/__tests__/snapshot-reclassify.test.ts",
+        "src/mcp/__tests__/snapshot-nqdc.test.ts",
+        "src/mcp/__tests__/git-store-app-token.test.ts",
+        "src/mcp/__tests__/plugin.test.ts",
+        "src/mcp/__tests__/knip-entries.test.ts",
+        "src/mcp/__tests__/http-entry.test.ts",
+        "src/mcp/__tests__/mcp-listen-timeout.test.ts",
+        "src/mcp/__tests__/oauth-server.test.ts",
+        "src/engine/__tests__/retirement-projection.test.ts",
+        "src/mcp/__tests__/project-retirement.test.ts",
+        "src/engine/__tests__/aca-and-scenarios.test.ts",
+        "src/mcp/__tests__/compare-scenarios.test.ts",
+        "src/engine/__tests__/irmaa.test.ts",
+        "src/engine/__tests__/plan-check.test.ts",
+        "src/mcp/__tests__/plan-check-tool.test.ts",
+        "src/engine/__tests__/change-and-nqdc.test.ts",
+        "src/engine/__tests__/social-security-cut.test.ts",
+        "src/engine/__tests__/lump-sums.test.ts",
+        "src/engine/__tests__/plan-tasks.test.ts",
+        "src/mcp/__tests__/explain-change-tool.test.ts",
+        "src/engine/__tests__/plan-verdict.test.ts",
+        "src/mcp/__tests__/plan-verdict-tool.test.ts",
+        "src/engine/__tests__/early-death-and-spousal.test.ts",
+        "src/engine/__tests__/market-assumptions-and-income-gap.test.ts",
+        "src/engine/__tests__/plan-rules-v1-tools.test.ts",
+        "src/mcp/__tests__/market-gap-v1-tools.test.ts",
+        "src/engine/__tests__/survivor-and-social-security.test.ts",
+        "src/engine/__tests__/historical-and-claiming.test.ts",
+        "src/mcp/__tests__/survivor-claiming-history-tools.test.ts",
+        "src/engine/__tests__/spending-guardrails.test.ts",
+        "src/mcp/__tests__/spending-guardrails-tool.test.ts",
+        "src/engine/__tests__/roth-conversion-explorer.test.ts",
+        "src/mcp/__tests__/roth-explorer-tool.test.ts"
+      ]
+    },
+    {
+      "id": "NFR-01",
+      "title": "Determinism",
+      "status": "implemented",
+      "design": "DESIGN.md §5",
+      "code": [
+        "src/engine/stable-id.ts",
+        "src/engine/monte-carlo.ts",
+        "skills/retire-runway/scripts/provenance.ts",
+        "skills/retire-runway/scripts/load-portfolio.ts",
+        "src/engine/retirement-projection.ts",
+        "src/engine/scenario-comparison.ts"
+      ],
+      "tests": [
+        "src/engine/__tests__/monte-carlo-worker-parity.test.ts",
+        "src/engine/__tests__/stable-id.test.ts",
+        "skills/retire-runway/scripts/__tests__/provenance.test.ts",
+        "skills/retire-runway/scripts/__tests__/load-portfolio-as-of.test.ts",
+        "src/engine/plan/__tests__/regression-fixtures.test.ts",
+        "src/engine/__tests__/retirement-projection.test.ts",
+        "src/engine/__tests__/aca-and-scenarios.test.ts"
+      ]
+    },
+    {
+      "id": "NFR-02",
+      "title": "Privacy (local-first)",
+      "status": "implemented",
+      "design": "DESIGN.md §1",
+      "code": [
+        "src/engine",
+        "src/app/privacy/page.tsx",
+        "src/mcp/user-store.ts",
+        "src/mcp/git-store.ts"
+      ],
+      "tests": [
+        "src/app/__tests__/marketing-claims.test.ts",
+        "src/engine/__tests__/monte-carlo-worker-parity.test.ts",
+        "src/mcp/__tests__/profile-store.test.ts",
+        "src/mcp/__tests__/store-contract.test.ts"
+      ]
+    },
+    {
+      "id": "NFR-03",
+      "title": "API security",
+      "status": "implemented",
+      "design": "DESIGN.md §2",
+      "code": [
+        "src/lib/rate-limiter.ts",
+        "src/lib/with-rate-limit.ts",
+        "src/lib/with-validation.ts",
+        "src/lib/with-auth.ts",
+        "src/lib/validation-schemas.ts",
+        "src/lib/logger.ts",
+        "src/app/api/stripe/webhook",
+        "src/app/api/email",
+        "src/app/api/subscription",
+        "src/mcp/http-auth.ts",
+        "src/mcp/oauth-server.ts"
+      ],
+      "tests": [
+        "src/lib/__tests__/rate-limiter.test.ts",
+        "src/lib/__tests__/with-rate-limit.test.ts",
+        "src/lib/__tests__/with-validation.test.ts",
+        "src/lib/__tests__/with-auth.test.ts",
+        "src/lib/__tests__/validation-schemas.test.ts",
+        "src/lib/__tests__/logger.test.ts",
+        "src/app/api/stripe/webhook/__tests__/route.test.ts",
+        "src/app/api/email/send-onboarding/__tests__/route.test.ts",
+        "src/app/api/subscription/__tests__/route.test.ts",
+        "src/mcp/__tests__/http-entry.test.ts",
+        "src/mcp/__tests__/oauth-server.test.ts",
+        "src/mcp/__tests__/http-auth-issuer.test.ts"
+      ]
+    },
+    {
+      "id": "NFR-04",
+      "title": "Regulatory posture",
+      "status": "implemented",
+      "design": "DESIGN.md §7",
+      "code": [
+        "src/components/financial-disclaimer.tsx",
+        "src/app/terms/page.tsx",
+        "src/app/privacy/page.tsx"
+      ],
+      "tests": ["src/app/__tests__/marketing-claims.test.ts"]
+    },
+    {
+      "id": "NFR-05",
+      "title": "Billing off by default",
+      "status": "implemented",
+      "design": "DESIGN.md §7",
+      "code": [
+        "src/lib/subscription-access.ts",
+        "src/store/subscription-store.ts",
+        "src/app/api/stripe",
+        "src/app/api/subscription",
+        "supabase/migrations/20260811_create_subscriptions.sql"
+      ],
+      "tests": [
+        "src/lib/__tests__/subscription-access.test.ts",
+        "src/store/__tests__/subscription-store.test.ts",
+        "src/app/api/stripe/checkout/__tests__/route.test.ts",
+        "src/app/api/stripe/webhook/__tests__/persistence.test.ts",
+        "scripts/__tests__/production-readiness.test.ts"
+      ],
+      "adr": ["ADR-004"]
+    },
+    {
+      "id": "NFR-06",
+      "title": "Accessibility",
+      "status": "implemented",
+      "design": "DESIGN.md §8",
+      "code": ["src/components", "src/app/page.tsx"],
+      "tests": ["tests/accessibility.test.js"]
+    },
+    {
+      "id": "NFR-07",
+      "title": "Supply chain and delivery gates",
+      "status": "implemented",
+      "design": "DESIGN.md §8",
+      "code": [
+        "scripts/security-audit.js",
+        "scripts/security-audit.sh",
+        "scripts/export-public.js",
+        "scripts/license-audit.js",
+        "scripts/run-semgrep.sh",
+        ".github/workflows/quality.yml",
+        ".husky/pre-commit"
+      ],
+      "tests": [
+        "scripts/__tests__/security-audit.test.ts",
+        "scripts/__tests__/export-public.test.ts",
+        "scripts/__tests__/license-audit.test.ts",
+        "scripts/__tests__/run-semgrep.test.js",
+        "scripts/__tests__/repo-gates.test.ts",
+        "tests/unit/ci/summary-gate.test.ts",
+        "tests/unit/ci/security-no-install.test.ts",
+        "tests/unit/vitest-hook-timeout.test.ts",
+        "tests/unit/ci/workflow-actionlint.test.ts",
+        "tests/unit/ci/audit-report-no-install.test.ts",
+        "tests/unit/ci/fork-runner-claim.test.ts",
+        "tests/unit/ci/install-budget-message.test.ts",
+        "scripts/__tests__/dependency-security-versions.test.ts",
+        "scripts/__tests__/minimatch-advisory.test.ts"
+      ],
+      "adr": ["ADR-008"]
+    },
+    {
+      "id": "NFR-08",
+      "title": "Deployment readiness",
+      "status": "implemented",
+      "design": "DESIGN.md §8",
+      "code": [
+        "scripts/production-readiness.js",
+        "scripts/launch-smoke.js",
+        "vercel.json"
+      ],
+      "tests": [
+        "scripts/__tests__/production-readiness.test.ts",
+        "scripts/__tests__/launch-smoke.test.ts",
+        "tests/e2e/smoke.test.js"
+      ],
+      "adr": ["ADR-007"]
+    },
+    {
+      "id": "NFR-09",
+      "title": "Traceability",
+      "status": "implemented",
+      "design": "DESIGN.md §8",
+      "code": ["scripts/check-traceability.js", "docs/traceability.json"],
+      "tests": ["scripts/__tests__/check-traceability.test.ts"]
+    },
+    {
+      "id": "DEF-01",
+      "title": "Multi-currency with dated FX",
+      "status": "out-of-scope",
+      "design": "REQUIREMENTS.md §4",
+      "code": [],
+      "tests": [],
+      "issue": "BUI-503",
+      "note": "USD-only in v1"
+    },
+    {
+      "id": "DEF-02",
+      "title": "International packs",
+      "status": "out-of-scope",
+      "design": "REQUIREMENTS.md §4",
+      "code": [],
+      "tests": [],
+      "issue": "BUI-504",
+      "note": "Out of v1"
+    },
+    {
+      "id": "DEF-03",
+      "title": "Divorce scenario; penalised early-withdrawal modelling",
+      "status": "out-of-scope",
+      "design": "REQUIREMENTS.md §4",
+      "code": [],
+      "tests": [],
+      "issue": "BUI-496",
+      "note": "Engine avoids penalised withdrawals"
+    },
+    {
+      "id": "DEF-04",
+      "title": "Paid tier, checkout, feature gating",
+      "status": "out-of-scope",
+      "design": "REQUIREMENTS.md §4",
+      "code": [],
+      "tests": [],
+      "issue": "BUI-526",
+      "note": "Regulatory gate"
+    },
+    {
+      "id": "DEF-05",
+      "title": "Live execution, advisor tier, native mobile",
+      "status": "out-of-scope",
+      "design": "REQUIREMENTS.md §4",
+      "code": [],
+      "tests": [],
+      "note": "Out of scope"
+    },
+    {
+      "id": "DEF-06",
+      "title": "Headless application contract and plan CLI (agent-first)",
+      "status": "out-of-scope",
+      "design": "REQUIREMENTS.md §4",
+      "code": [],
+      "tests": [],
+      "issue": "BUI-823",
+      "note": "Branch feature/bui-823-agent-first-cli kept on origin"
+    }
+  ]
+}

@@ -1,0 +1,181 @@
+{
+  "name": "retire-runway",
+  "version": "1.0.1",
+  "private": true,
+  "description": "Financial modelling tool for pre-retirees",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "mcp": "node src/mcp/run.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "[ \"$CI\" = \"true\" ] && echo 'Skipping Husky in CI' || husky",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:fast": "vitest run --reporter=dot --coverage=false",
+    "test:medium": "vitest run --reporter=dot --exclude='**/*.{e2e,integration}.test.*' --coverage=false",
+    "test:comprehensive": "vitest run && npm run lint && npm run format:check && npm run security:audit 2>/dev/null || true",
+    "test:smart": "bash scripts/smart-test-strategy.sh",
+    "test:a11y": "vitest run tests/accessibility.test.js",
+    "test:coverage:check": "vitest run --config vitest.coverage.config.ts --coverage --coverage.thresholds.lines=70 --coverage.thresholds.functions=70",
+    "lint": "eslint . && stylelint \"**/*.{css,scss,sass,less,pcss}\" --allow-empty-input",
+    "lint:fix": "eslint . --fix && stylelint \"**/*.{css,scss,sass,less,pcss}\" --fix --allow-empty-input",
+    "type-check": "tsc --noEmit",
+    "quality:check": "npm run type-check && npm run lint && npm run traceability:check && npm run test",
+    "quality:ci": "npm run quality:check && npm run security:audit",
+    "traceability:check": "node scripts/check-traceability.js",
+    "traceability:write": "node scripts/check-traceability.js --write",
+    "security:audit": "bash scripts/security-audit.sh",
+    "readiness:check": "node scripts/production-readiness.js --mode production",
+    "launch:smoke": "node scripts/launch-smoke.js",
+    "security:secrets": "node -e \"const fs=require('fs');const content=fs.readFileSync('package.json','utf8');if(/[\\\"\\'][a-zA-Z0-9+/]{20,}[\\\"\\']/.test(content)){console.error('Potential hardcoded secrets in package.json');process.exit(1)}else{console.log('No secrets detected in package.json')}\"",
+    "validate:pre-push": "npm run lint && npm run format:check && npm test --if-present",
+    "size": "size-limit",
+    "size:why": "size-limit --why",
+    "test:changed": "vitest run --changed HEAD~1 --passWithNoTests",
+    "security:config": "npx create-qa-architect@latest --security-config",
+    "validate:docs": "npx create-qa-architect@latest --validate-docs",
+    "validate:comprehensive": "npx create-qa-architect@latest --comprehensive",
+    "validate:all": "npm run validate:comprehensive && npm run security:audit",
+    "type-check:tests": "tsc --noEmit --project tests/tsconfig.json",
+    "type-check:all": "npm run type-check && npm run type-check:tests",
+    "dead-code": "knip --no-exit-code || echo \"Dead code found (non-blocking)\"",
+    "dead-code:strict": "knip",
+    "dead-code:exports": "knip --include exports,types,duplicates",
+    "pattern-check": "bash scripts/pattern-check.sh",
+    "test:patterns": "bash scripts/pattern-check.sh --all",
+    "security:scan": "bash scripts/run-semgrep.sh",
+    "security:scan:ci": "bash scripts/run-semgrep.sh --ci",
+    "license:check": "bash scripts/license-audit.sh"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.33",
+    "@ai-sdk/openai": "^3.0.23",
+    "@ai-sdk/react": "^3.0.67",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-slider": "^1.3.6",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@react-email/components": "^1.0.6",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.93.3",
+    "ai": "^6.0.64",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "jose": "^6.2.15",
+    "lucide-react": "^0.563.0",
+    "next": "^16.4.5",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "recharts": "^3.7.0",
+    "resend": "^6.18.1",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.10"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@size-limit/file": "^11.0.0",
+    "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.1.12",
+    "axe-core": "^4.10.0",
+    "commitlint": "^20.4.1",
+    "esbuild": "^0.28.1",
+    "eslint": "^9",
+    "eslint-config-next": "^16.2.12",
+    "eslint-plugin-security": "^3.0.1",
+    "husky": "^9.1.4",
+    "jsdom": "^30.0.1",
+    "knip": "^6.0.1",
+    "license-checker": "^25.0.1",
+    "lint-staged": "^15.2.10",
+    "postcss": "^8.5.26",
+    "prettier": "^3.3.3",
+    "size-limit": "^11.0.0",
+    "stylelint": "^16.8.0",
+    "stylelint-config-standard": "^37.0.0",
+    "tailwindcss": "^4",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5",
+    "vitest": "^4.1.12"
+  },
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "overrides": {
+    "@babel/core": "^7.29.7",
+    "basic-ftp": "^6.0.2",
+    "minimatch": "^11.0.1",
+    "brace-expansion": "^5.0.9",
+    "nanoid": "^3.3.17",
+    "fast-uri": "^4.1.2",
+    "ip-address": "^10.4.0",
+    "js-yaml": "^5.2.3",
+    "postcss": "^8.5.26",
+    "qs": "^6.15.3",
+    "sharp": "^0.35.3",
+    "tmp": "^0.2.7",
+    "uuid": "^11.1.1",
+    "ws": "^8.21.1"
+  },
+  "lint-staged": {
+    "package.json": [
+      "prettier --write"
+    ],
+    "**/*.{ts,tsx,js,jsx,mjs,cjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "**/*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "**/*.{css,scss,sass,less,pcss}": [
+      "stylelint --fix",
+      "prettier --write"
+    ],
+    "**/*.{js,jsx,ts,tsx,mjs,cjs,html}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "src/**/*.{css,scss,sass,less,pcss}": [
+      "stylelint --fix",
+      "prettier --write"
+    ],
+    "**/*.{js,jsx,mjs,cjs,html}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "tests/**/*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
+  "volta": {
+    "node": "24.18.0",
+    "npm": "10.2.4"
+  },
+  "size-limit": [
+    {
+      "path": "public/**/*.js",
+      "limit": "250 kB"
+    },
+    {
+      "path": "public/**/*.css",
+      "limit": "50 kB"
+    }
+  ]
+}
