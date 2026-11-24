@@ -218,7 +218,15 @@ nothing. Never trade, never change the saved profile, and write only the
    call `explore_roth_conversions` and report `best` and the conversion for
    the current year from its `conversionsByAge`.
 5. Call `plan_verdict` with `asOfDate` set to today; the brief opens with its
-   verdict and headline. Then call `plan_check` with `asOfDate` set to today. Its `headline` and each
+   verdict and headline. Then call `plan_check` with `asOfDate` set to today.
+   When `planRules.cdLadder` is saved, first read current yields from a page
+   that shows its own as-of date (the broker's new-issue CD and Treasury
+   table, or the US Treasury daily par yield curve) and pass them as
+   `rateQuotes`, with `quotedOn` set to the date the page shows, never
+   today's date by default: a cached page can be weeks old, and the engine
+   flags quotes more than 7 days old. Use call-protected CD yields only. With
+   no dated page, call it without `rateQuotes` and add the action "Check
+   today's CD and Treasury yields before buying the ladder rungs". Its `headline` and each
    recommendation's `action` line (overdue or due sales, rebalancing, cash
    buffer) go first in the brief, as written. With no `planRules` saved, add
    the action "Save plan rules (target stock share, sell schedule)".

@@ -6,10 +6,15 @@ are recorded as ADRs in [decisions/](decisions/).
 
 ## 1. Shape
 
-A Next.js 16 App Router app. All planning arithmetic is a pure TypeScript
-engine that runs in the browser. Server routes exist only for optional
-features: AI narration, auth and sync, Plaid, the public API, and (disabled)
-billing.
+A Next.js 16 App Router app around one pure TypeScript engine. The main
+surface is the MCP server (`src/mcp`, FR-23): Claude calls its tools over
+stdio (Claude Code) or HTTP (`/api/mcp`, signed in through the owner-only
+OAuth server), the tools run the engine and stamp every result, and the
+owner's data lives in a private GitHub repo or a local folder. The original
+browser app is frozen; it runs the same engine in the browser. Other server
+routes are optional: AI narration, auth and sync, Plaid, the public API and
+(disabled) billing. The landing page (`site/`) is static and ships with the
+open-source copy.
 
 ```
 UI (src/app, src/components)  ──►  stores (src/store, Zustand)

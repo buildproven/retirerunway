@@ -9,13 +9,16 @@ analysis (`docs/archive/PRD_V4_GAP_ANALYSIS-2026-07-26.md`), both kept for histo
 
 ## 1. Product
 
-RetireRunway is a free, local-first, educational retirement-transition planner for
-people about to leave full-time work. It answers: _can I leave, and does the bridge
-to Social Security and Medicare survive stress?_ It returns a deterministic
-GO / CAUTION / DELAY outcome, the minimum outside income that makes the plan
-work, and the reasons, all computed in the browser. Portfolio tools (CSV import,
-risk score, trade ideas, CD and cash-ladder analysis, Roth conversion, Monte Carlo)
-are secondary.
+RetireRunway is a free, open-source (MIT), educational retirement planner for
+people about to leave full-time work. Its main surface is Claude: a plugin and
+MCP server (FR-23) whose tools run the deterministic engine and return every
+figure with a provenance stamp, while Claude only explains them. It answers:
+_can I leave, and does the bridge to Social Security and Medicare survive
+stress?_ with a GO / CAUTION / DELAY verdict, the chance the money lasts, what
+to spend, and what to do next from the owner's own rules (sales, a CD ladder,
+tasks). The original browser app (plan wizard, results, portfolio tools) is
+frozen: it still builds and its tests still run, and it computes in the
+browser.
 
 **Distribution decision (2026-10-03):** the product is free (MIT-licensed). It
 produces outputs close to personalised investment recommendations ("suggested
@@ -113,7 +116,11 @@ Twelve plan regression fixtures are the acceptance suite for engine changes.
 
 ### FR-13 Portfolio import
 
-CSV (Fidelity, Schwab, Vanguard, generic), Plaid mapping, and manual entry.
+CSV (Fidelity, Schwab, Vanguard, generic), Plaid mapping, and manual entry. A holding
+named with a coupon and a maturity date (an individual CD, Treasury or other
+note) is fixed income: `cd` when the name has the word CD or "certificate",
+otherwise `us_bond`; a Treasury name is `us_bond`. Only a holding no rule
+matches defaults to `us_equity`, with a warning.
 Parsing never throws to the UI; malformed rows are skipped with warnings. IDs are
 content-derived and stable.
 
@@ -290,7 +297,13 @@ registration (`POST /oauth/register`, JSON) or presented as a client ID
 metadata document may use only the redirect
 `https://claude.ai/api/mcp/auth_callback` or a loopback redirect
 `http://localhost:<port>/callback` or `http://127.0.0.1:<port>/callback`; any
-other redirect is refused (REQ-MCP-28). When the owner completes GitHub
+other redirect is refused (REQ-MCP-28). Before fetching a client metadata
+document the server resolves its host and refuses it unless every address is
+public (no private, loopback, link-local or cloud metadata address), then
+connects to the address it checked, so a DNS rebinding answer cannot move the
+fetch (REQ-MCP-28). When the spent-grant record cannot be read, the reply says
+only to try again later; the detail, which names the owner's private data
+repo, goes to the server log, unless it is a setup step the owner must take. When the owner completes GitHub
 sign-in, the token endpoint (`POST /oauth/token`, form-urlencoded) trades the
 code and a matching PKCE verifier for a JWT access token (audience
 `<origin>/api/mcp`, subject `OWNER_GITHUB_LOGIN`, one hour) that the resource
@@ -615,10 +628,12 @@ canonicalisation before hashing; ≥128-bit content IDs.
 
 ### NFR-02 Privacy (local-first)
 
-All planning arithmetic runs client-side. Only optional LLM calls, sync, and
-Plaid leave the browser, and each is disclosed. The MCP server stores user
-data only in the user's own data directory, outside the package and repo, or
-in the owner's own private GitHub repo (FR-23).
+In the web app, planning arithmetic runs in the browser; only optional LLM
+calls, sync and Plaid leave it, and each is disclosed. The MCP server computes
+where it runs (the owner's own machine or the owner's own deployment) and
+stores user data only in the user's own data directory, outside the package
+and repo, or in the owner's own private GitHub repo (FR-23). The open-source
+copy carries none of the owner's data (NFR-07).
 
 ### NFR-03 API security
 
@@ -652,7 +667,8 @@ owner's deploy job, archived plans), with the owner's sections of CLAUDE.md
 dropped, the public README in place and the plugin links pointed at the
 public repo. It exits 1, listing each hit, when any copied text file matches
 the private denylist (`.public-export/denylist.txt`, never exported). Each
-release is one fresh commit in the public repo, with no history.
+release is one commit in the public repo made from a fresh export, so its
+history holds only exported copies, never the private history.
 
 ### NFR-08 Deployment readiness
 

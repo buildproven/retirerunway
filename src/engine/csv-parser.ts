@@ -174,6 +174,9 @@ function detectFormat(headers: string[]): BrokerageFormat {
 // Names and symbols that mark a holding as US equity. A holding that matches
 // no rule still reads as us_equity, but with a warning naming it, so an
 // unknown fund is visible instead of silently US equity.
+/** A coupon then a maturity date, as an individual bond, note or CD is named. */
+export const INDIVIDUAL_SECURITY = /\d+(\.\d+)?%\s+\d{1,2}\/\d{1,2}\/\d{4}/
+
 const US_EQUITY_NAMES = [
   's&p 500',
   '500 index',
@@ -237,8 +240,8 @@ export function matchAssetClass(
     return 'money_market'
   if (symUpper === 'CASH' || nameLower.includes('cash')) return 'cash'
 
-  if (nameLower.includes('cd ') || nameLower.includes('certificate'))
-    return 'cd'
+  // A brokered CD: "… CD 4.80000% 11/29/2027 …" or "… 12/02/2030 CD".
+  if (/\bcd\b/.test(nameLower) || nameLower.includes('certificate')) return 'cd'
 
   if (nameLower.includes('reit') || nameLower.includes('real estate'))
     return 'reit'
@@ -256,6 +259,14 @@ export function matchAssetClass(
 
   if (nameLower.includes('tips') || nameLower.includes('inflation protected'))
     return 'tips'
+
+  // An individual Treasury or other note with a coupon and a maturity date
+  // ("UNITED STATES TREAS NTS 4.25000% 11/30/2027"): fixed income, never stock.
+  if (
+    /\btreas(ury)?\b|\bt-?bills?\b/.test(nameLower) ||
+    INDIVIDUAL_SECURITY.test(nameLower)
+  )
+    return 'us_bond'
 
   if (
     nameLower.includes('emerging') ||

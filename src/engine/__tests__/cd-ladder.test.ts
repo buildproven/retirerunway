@@ -1,4 +1,6 @@
 // CD and Treasury ladder in plan_check (REQ-MCP-63). Invented household only.
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { planCheckInput, userProfileSchema } from '../../mcp/schemas'
 import {
@@ -7,6 +9,7 @@ import {
   maturityYearFromName,
   planCdLadder,
 } from '../cd-ladder'
+import { parsePortfolioCSV } from '../csv-parser'
 import { PlanCheckError, checkPlan } from '../plan-check'
 import type {
   CdLadderRule,
@@ -398,5 +401,50 @@ describe('ladder account and sales already done (REQ-MCP-63)', () => {
     expect(after.recommendations[0]?.kind).toBe('refresh_snapshot')
     // The ladder gets the 60,000 once: 30,000 idle + 60,000 done.
     expect(after.cdLadder?.fundingNow).toBe(90_000)
+  })
+})
+
+describe('a Fidelity positions file with brokered CDs (REQ-MCP-63)', () => {
+  const csv = readFileSync(
+    join(
+      __dirname,
+      '../../../skills/retire-runway/fixtures/csv/fidelity-cds.csv'
+    ),
+    'utf8'
+  )
+  const parsed = parsePortfolioCSV(csv)
+  const imported: Portfolio = {
+    id: 'import',
+    name: 'Import',
+    asOfDate: '2026-12-01',
+    accounts: parsed.accounts,
+  }
+
+  it('reads each CD as a CD, valued from the Current value column, not quantity × price', () => {
+    const window = imported.accounts.find(a => a.name === 'BrokerageLink')
+    expect(window?.accountType).toBe('401k')
+    const cds = window?.holdings.filter(h => h.assetClass === 'cd') ?? []
+    expect(cds.map(h => h.currentValue)).toEqual([
+      35_003.5, 36_007.2, 6_000, 25_994.8,
+    ])
+    // A Treasury note is fixed income, and nothing in the file defaults to stock.
+    const note = window?.holdings.find(h => h.symbol === '91282CAB1')
+    expect(note?.assetClass).toBe('us_bond')
+    expect(parsed.warnings.join(' ')).not.toContain('as us_equity')
+  })
+
+  it('places each CD in the rung of its maturity year', () => {
+    const plan = planCdLadder(imported, rule, {
+      asOfDate: '2026-12-01',
+      saleProceedsNow: [],
+      saleProceedsLater: [],
+    })
+    expect(plan?.accountName).toBe('BrokerageLink')
+    expect(plan?.unknownMaturity).toEqual([])
+    // The Treasury note counts in its 2029 rung too.
+    expect(plan?.heldInLadder.map(h => h.year)).toEqual([
+      2027, 2028, 2029, 2030, 2029,
+    ])
+    expect(plan?.idleCash).toBe(9_000)
   })
 })

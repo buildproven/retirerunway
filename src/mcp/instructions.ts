@@ -35,9 +35,9 @@ Educational simulation, not investment, tax or legal advice. Tell the user to ch
  * lines (REQ-MCP-37). Update it with each release.
  */
 export const WHATS_NEW: readonly string[] = [
+  'Fix: a positions file with brokered CDs or Treasury notes reads them as fixed income (a CD named with CD at the end, or a Treasury note, was counted as stock), and the ladder counts each note in the rung of its maturity year.',
+  'Security: sign-in refuses a client metadata URL that points at a private or internal address, and no longer shows your data repo name in sign-in errors.',
   'Fix: plan_check takes a sale marked done after the snapshot off your stocks and counts its proceeds as cash, so it is never sold or counted twice; the ladder buys in the one account that holds the ladder money (planRules.cdLadder.accountName to choose).',
   'planRules.cdLadder: plan_check builds your CD or Treasury ladder, one rung per year: what each rung holds, what to buy now with the cash that is ready, and the best call-protected yield for each term from rateQuotes.',
   'Fix: the cash buffer counts liquid cash only (taxable accounts plus planRules.outsideCash for bank savings). Cash inside a 401(k) or IRA is shown apart as retirementAccountCash and never counts.',
-  'v1.0.0: RetireRunway is open source under MIT (github.com/buildproven/retirerunway), with a site at retirerunway.buildproven.ai.',
-  'planRules.tasks: one-off actions that are not stock sales (a fund switch, a CD rollover) with due dates; plan_check flags them when due or overdue.',
 ]

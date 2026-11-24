@@ -11,6 +11,8 @@ const eslintConfig = defineConfig([
     'coverage/**',
     'out/**',
     'build/**',
+    // Bundles the tests build (gitignored); lint their sources instead.
+    '**/dist/**',
     'next-env.d.ts',
     'tests/**',
     'scripts/**',

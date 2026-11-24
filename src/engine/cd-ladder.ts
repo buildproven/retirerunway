@@ -4,6 +4,7 @@
 // cash that is ready now in the earliest rungs that are short, in $1,000 units,
 // at the best call-protected quote for each term. Deterministic: quotes and the
 // as-of date are inputs; nothing here fetches rates or trades.
+import { INDIVIDUAL_SECURITY } from './csv-parser'
 import type {
   Account,
   AccountType,
@@ -251,11 +252,10 @@ export function planCdLadder(
         continue
       }
       const etfYear = IBONDS_TREASURY_YEARS[symbol]
+      const individual =
+        holding.assetClass === 'cd' || INDIVIDUAL_SECURITY.test(holding.name)
       const year =
-        etfYear ??
-        (holding.assetClass === 'cd'
-          ? maturityYearFromName(holding.name)
-          : undefined)
+        etfYear ?? (individual ? maturityYearFromName(holding.name) : undefined)
       const entry = (y: number): LadderHolding => ({
         symbol: holding.symbol,
         name: holding.name,

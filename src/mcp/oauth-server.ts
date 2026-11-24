@@ -26,6 +26,13 @@ import {
   createAppTokenSource,
   type TokenSource,
 } from './github-app-token'
+import {
+  fetchPinned,
+  pinOf,
+  ssrfProtection,
+  type DnsResolver,
+  type PinnedAddress,
+} from '@/lib/ssrf-protection'
 import { MCP_PATH, readIssuer, type Checked } from './http-auth'
 
 export const OWNER_LOGIN_ENV = 'OWNER_GITHUB_LOGIN'
@@ -120,6 +127,17 @@ const REPO_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+$/
 
 export class GrantStoreError extends Error {
   override readonly name = 'GrantStoreError'
+
+  /**
+   * True when the message is a setup step for the owner (the GitHub App is
+   * not installed, or its settings are wrong), not a GitHub or repo failure.
+   */
+  readonly ownerAction: boolean
+
+  constructor(message: string, ownerAction = false) {
+    super(message)
+    this.ownerAction = ownerAction
+  }
 }
 
 interface LedgerFile {
@@ -156,7 +174,12 @@ export function createGitHubGrantStore(options: {
       token = await options.tokens.token()
     } catch (error) {
       if (!(error instanceof GitHubAppTokenError)) throw error
-      throw new GrantStoreError(error.message)
+      // A missing install or a wrong app key is the owner's to fix; GitHub
+      // being down or answering oddly is not.
+      throw new GrantStoreError(
+        error.message,
+        error.field === DATA_REPO_ENV || error.field === APP_KEY_ENV
+      )
     }
     let response: Response
     try {
@@ -257,11 +280,20 @@ export function createGitHubGrantStore(options: {
   }
 }
 
-type FetchFn = (input: string, init: RequestInit) => Promise<Response>
+type FetchFn = (
+  input: string,
+  init: RequestInit,
+  pin?: PinnedAddress
+) => Promise<Response>
 
 export interface OAuthDeps {
   readonly env: Env
   readonly fetch: FetchFn
+  /**
+   * The DNS lookups of the SSRF check on a client metadata document URL; by
+   * default the real resolver (`dns.promises`).
+   */
+  readonly resolver?: DnsResolver
   /** Milliseconds since the epoch. */
   readonly now: () => number
   /** The spent-grant record; by default the GitHub one from the env. */
@@ -643,7 +675,20 @@ function buildOAuthServer(
   const now = overrides.now ?? (() => Date.now())
   const deps: OAuthDeps = {
     env: overrides.env ?? process.env,
-    fetch: overrides.fetch ?? ((input, init) => fetch(input, init)),
+    fetch:
+      overrides.fetch ??
+      ((input, init, pin) =>
+        pin === undefined
+          ? fetch(input, init)
+          : fetchPinned(input, pin, {
+              headers: init.headers,
+              signal: init.signal,
+              // One byte over the limit, so readLimited reports the size.
+              maxBytes: DOCUMENT_LIMIT + 1,
+            })),
+    ...(overrides.resolver === undefined
+      ? {}
+      : { resolver: overrides.resolver }),
     now,
     ...(overrides.store !== undefined
       ? { store: overrides.store }
@@ -675,11 +720,25 @@ function buildOAuthServer(
       return bad('the client_id URL is not accepted')
     let body: string | undefined
     try {
-      const response = await deps.fetch(clientId, {
-        headers: { accept: 'application/json' },
-        redirect: 'error',
-        signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS),
-      })
+      // The host must resolve, and only to public addresses (REQ-MCP-28).
+      const signal = AbortSignal.timeout(OUTBOUND_TIMEOUT_MS)
+      const safe = await ssrfProtection.validateUrl(
+        clientId,
+        signal,
+        deps.resolver
+      )
+      if (!safe.allowed || safe.ip === undefined)
+        return bad(`the client_id URL is refused: ${safe.error}`)
+      // Connect to the checked address, so DNS rebinding cannot swap it.
+      const response = await deps.fetch(
+        clientId,
+        {
+          headers: { accept: 'application/json' },
+          redirect: 'error',
+          signal,
+        },
+        pinOf(safe.ip)
+      )
       if (!response.ok) return bad(`the fetch answered ${response.status}`)
       body = await readLimited(response, DOCUMENT_LIMIT)
     } catch {
@@ -1083,10 +1142,15 @@ function buildOAuthServer(
     } catch (error) {
       if (!(error instanceof GrantStoreError)) throw error
       // Without the spent-grant record a reuse cannot be told apart from a
-      // first use, so no token is issued.
+      // first use, so no token is issued. The detail names the owner's
+      // private data repo, so it goes to the server log, not the caller;
+      // only a setup step the owner must take is in the reply.
+      console.error(`RetireRunway OAuth: ${error.message}`)
       return oauthError(
         'temporarily_unavailable',
-        `the spent-grant record is unavailable: ${error.message}`,
+        error.ownerAction
+          ? `the spent-grant record is unavailable: ${error.message}`
+          : 'the spent-grant record is unavailable; try again later',
         503
       )
     }

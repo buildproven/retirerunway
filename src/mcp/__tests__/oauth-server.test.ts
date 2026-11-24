@@ -13,6 +13,11 @@ import {
   it,
   vi,
 } from 'vitest'
+import {
+  ssrfProtection,
+  type DnsResolver,
+  type PinnedAddress,
+} from '@/lib/ssrf-protection'
 import { GET as metadataRoute } from '@/app/.well-known/oauth-authorization-server/route'
 import { GET as authorizeRoute } from '@/app/oauth/authorize/route'
 import { GET as githubCallbackRoute } from '@/app/oauth/github/callback/route'
@@ -29,6 +34,24 @@ const OWNER = 'Owner-Login'
 const CLAUDE_REDIRECT = 'https://claude.ai/api/mcp/auth_callback'
 const LOOPBACK_REDIRECT = 'http://localhost:53682/callback'
 const CIMD_URL = 'https://client.example.test/oauth/client.json'
+const CIMD_HOST = 'client.example.test'
+const PUBLIC_IP = '93.184.216.34'
+// DNS for the SSRF check, faked: host -> addresses. Real DNS is never used.
+let dnsTable: Record<string, { v4?: string[]; v6?: string[] }> = {}
+let resolverCalls: string[] = []
+const fakeResolver: DnsResolver = {
+  async resolve4(host) {
+    resolverCalls.push(host)
+    const row = dnsTable[host]
+    if (row === undefined) throw new Error(`ENOTFOUND ${host}`)
+    return row.v4 ?? []
+  },
+  async resolve6(host) {
+    const row = dnsTable[host]
+    if (row === undefined) throw new Error(`ENOTFOUND ${host}`)
+    return row.v6 ?? []
+  },
+}
 const GITHUB_ID = 'gh-oauth-client'
 const GITHUB_SECRET = 'gh-oauth-secret'
 // The installation token the GitHub App endpoints mint for the data repo.
@@ -168,6 +191,7 @@ function newServer(overrides: Record<string, string> = {}): OAuthServer {
     env: { ...env, ...overrides },
     fetch: fakeFetch,
     now: () => clock,
+    resolver: fakeResolver,
   })
 }
 
@@ -187,11 +211,14 @@ function newFactoryServerWithoutHostedStore(): OAuthServer {
     env: factoryEnv,
     fetch: fakeFetch,
     now: () => clock,
+    resolver: fakeResolver,
   })
 }
 
 beforeEach(() => {
   clock = Date.now()
+  dnsTable = { [CIMD_HOST]: { v4: [PUBLIC_IP] } }
+  resolverCalls = []
   githubCalls = []
   ledger = undefined
   ledgerWrites = 0
@@ -631,6 +658,7 @@ describe('REQ-MCP-28: only Claude redirects are accepted', () => {
     const failing = createOAuthServer({
       env,
       now: () => clock,
+      resolver: fakeResolver,
       fetch: async () => {
         throw new Error('offline')
       },
@@ -642,6 +670,7 @@ describe('REQ-MCP-28: only Claude redirects are accepted', () => {
     const large = createOAuthServer({
       env,
       now: () => clock,
+      resolver: fakeResolver,
       fetch: async () => new Response('{"pad":"' + 'x'.repeat(20_000) + '"}'),
     })
     const response = await large.authorize(
@@ -1141,6 +1170,7 @@ describe('REQ-MCP-30: only the owner signs in', () => {
       server = createOAuthServer({
         env,
         now: () => clock,
+        resolver: fakeResolver,
         fetch: (url, init) =>
           url === CIMD_URL ? fakeFetch(url, init) : fail(url),
       })
@@ -1346,9 +1376,11 @@ describe('REQ-MCP-31: reuse is caught on every server instance', () => {
     expect(response.status).toBe(503)
     const body = (await response.json()) as Record<string, string>
     expect(body.error).toBe('temporarily_unavailable')
-    expect(body.error_description).toContain(
-      'owner/rr-data/retire-runway/oauth-grants.json'
+    // The detail names the owner's private data repo: server log only.
+    expect(body.error_description).toBe(
+      'the spent-grant record is unavailable; try again later'
     )
+    expect(JSON.stringify(body)).not.toContain('rr-data')
     expect(JSON.stringify(body)).not.toContain(DATA_TOKEN)
     expect(body).not.toHaveProperty('access_token')
   })
@@ -1365,6 +1397,7 @@ describe('REQ-MCP-31: reuse is caught on every server instance', () => {
     server = createHostedOAuthServer({
       env,
       now: () => clock,
+      resolver: fakeResolver,
       fetch: async (url, init) => {
         if (url === LEDGER_URL) throw new Error(`offline ${DATA_TOKEN}`)
         return fakeFetch(url, init)
@@ -1571,3 +1604,74 @@ describe('REQ-MCP-28: a loopback redirect matches on any port', () => {
     }
   )
 })
+
+describe('REQ-MCP-28: a client metadata document goes through the SSRF check', () => {
+  it.each([
+    ['a private address', { v4: ['10.1.2.3'] }],
+    ['loopback', { v4: ['127.0.0.1'] }],
+    ['the cloud metadata address', { v4: ['169.254.169.254'] }],
+    ['one public and one private address', { v4: [PUBLIC_IP, '10.1.2.3'] }],
+    ['a private IPv6 address', { v4: [], v6: ['fd00::1'] }],
+  ])(
+    'refuses a client_id URL that resolves to %s, without fetching it',
+    async (_name, row) => {
+      dnsTable = { [CIMD_HOST]: row }
+      const fetched: string[] = []
+      const guarded = createOAuthServer({
+        env,
+        now: () => clock,
+        resolver: fakeResolver,
+        fetch: async (url, init) => {
+          fetched.push(url)
+          return fakeFetch(url, init)
+        },
+      })
+      const response = await guarded.authorize(
+        authorizeRequest(authorizeParams(CIMD_URL, pkce().challenge))
+      )
+      expect(response.status).toBe(400)
+      expect(await response.text()).toContain('refused')
+      expect(fetched).not.toContain(CIMD_URL)
+    }
+  )
+
+  it('refuses a host that does not resolve', async () => {
+    dnsTable = {}
+    const response = await server.authorize(
+      authorizeRequest(authorizeParams(CIMD_URL, pkce().challenge))
+    )
+    expect(response.status).toBe(400)
+  })
+
+  it('fetches the document pinned to the address the check allowed', async () => {
+    const pins: (PinnedAddress | undefined)[] = []
+    const pinned = createOAuthServer({
+      env,
+      now: () => clock,
+      resolver: fakeResolver,
+      fetch: async (url, init, pin) => {
+        if (url === CIMD_URL) pins.push(pin)
+        return fakeFetch(url, init)
+      },
+    })
+    await pinned.authorize(
+      authorizeRequest(authorizeParams(CIMD_URL, pkce().challenge))
+    )
+    expect(resolverCalls).toContain(CIMD_HOST)
+    expect(pins).toEqual([pinOfFor(PUBLIC_IP)])
+  })
+
+  it('the library refuses private addresses on its own', async () => {
+    dnsTable = { 'internal.example.test': { v4: ['10.0.0.1'] } }
+    const refused = await ssrfProtection.validateUrl(
+      'https://internal.example.test/x',
+      undefined,
+      fakeResolver
+    )
+    expect(refused.allowed).toBe(false)
+  })
+})
+
+function pinOfFor(ip: string): PinnedAddress {
+  return { address: ip, family: ip.includes(':') ? 6 : 4 }
+}

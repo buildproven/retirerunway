@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { parsePortfolioCSV } from '../csv-parser'
+import { matchAssetClass, parsePortfolioCSV } from '../csv-parser'
 
 const FIDELITY_2026_CSV = readFileSync(
   resolve(
@@ -353,5 +353,22 @@ Main,MSFT,Microsoft,5,380.00,1900.00,1500.00`
       expect(result.warnings[0]).not.toContain('undefined')
       expect(result.warnings[0]).not.toContain('null')
     })
+  })
+})
+
+describe('matchAssetClass: individual CDs and notes are never stock', () => {
+  it.each([
+    ['EXAMPLE BANK NA CD 4.80000% 11/29/2027 FDIC INS', 'cd'],
+    ['OTHER BANK 5.05000% 12/02/2030 CD', 'cd'],
+    ['TERM BANK CERTIFICATE OF DEPOSIT 5.00000% 12/03/2029', 'cd'],
+    ['UNITED STATES TREAS NTS NOTE 4.25000% 11/30/2029', 'us_bond'],
+    ['UNITED STATES TREAS BILLS 0.00000% 05/21/2027', 'us_bond'],
+    ['EXAMPLE CORP 5.25000% 06/15/2031', 'us_bond'],
+  ])('%s is %s', (name, expected) => {
+    expect(matchAssetClass('91282CAB1', name)).toBe(expected)
+  })
+
+  it('leaves names that only contain the letters cd alone', () => {
+    expect(matchAssetClass('ABCD', 'ABCDEF GROWTH FUND')).not.toBe('cd')
   })
 })
