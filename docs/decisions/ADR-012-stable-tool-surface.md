@@ -3,7 +3,7 @@
 - Status: accepted
 - Date: 2026-11-24
 - Requirements: REQ-MCP-73, REQ-MCP-74
-- Standard: buildproven/machine-setup `docs/agent-app-standard.md`
+- Standard: the shared agent-app template, rules 9 to 14
 
 ## Context
 
@@ -34,5 +34,5 @@ new field (its copy of the save_profile schema rejected it).
   themselves; after that, new tools and fields work in open chats.
 - Direct calls with a stale schema still work for every existing field;
   new fields go through `update_profile` or `run_tool`.
-- The same pattern applies to every MCP app (JobRecon, Lifescape,
-  Wanderpage) through the shared standard.
+- The same pattern applies to every MCP product through the shared
+  standard.
