@@ -509,6 +509,23 @@ export const userProfileSchema = z.strictObject({
       reviewEveryDays: z.number().int().min(7).max(366).optional(),
     })
     .optional(),
+  // REQ-MCP-71: stock share by age.
+  glidePath: z
+    .array(
+      z.strictObject({
+        age: finite.min(18).max(110),
+        equityShare: finite.min(0).max(1),
+      })
+    )
+    .min(1)
+    .max(10)
+    .optional(),
+  // REQ-MCP-70: which accounts pay spending first.
+  withdrawalOrder: z
+    .enum(['taxableFirst', 'preTaxFirst', 'proportional'])
+    .optional(),
+  // REQ-MCP-72: card and other short-term debt to clear.
+  consumerDebt: finite.min(0).optional(),
   // REQ-MCP-51: near-term market means (preset 'forecast' or your own), then long-run.
   marketAssumptions: z
     .strictObject({
@@ -713,6 +730,29 @@ export const reviewPlanInput = z.strictObject({
   portfolio: portfolioSchema.optional(),
   asOfDate: isoDate.optional(),
   seed: z.number().int().optional(),
+})
+
+// REQ-MCP-70: compare withdrawal orders.
+export const exploreWithdrawalOrderInput = z.strictObject({
+  profile: userProfileSchema.optional(),
+  portfolio: portfolioSchema.optional(),
+  seed: z.number().int().optional(),
+})
+
+// REQ-MCP-72: a balance sheet from an aggregator's net-worth list.
+export const importBalancesInput = z.strictObject({
+  text: z.string().min(1).max(20_000),
+  asOfDate: isoDate,
+  earmarks: z
+    .array(
+      z.strictObject({
+        account: z.string().trim().min(1).max(60),
+        amount: finite.positive(),
+        purpose: z.string().trim().min(1).max(80),
+      })
+    )
+    .max(10)
+    .optional(),
 })
 
 // REQ-MCP-64: the engine's proposed plan rules.

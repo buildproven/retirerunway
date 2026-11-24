@@ -30,9 +30,11 @@ const TOOL_NAMES = [
   'explain_change',
   'explore_claiming_ages',
   'explore_roth_conversions',
+  'explore_withdrawal_order',
   'get_briefing',
   'get_profile',
   'historical_backtest',
+  'import_balances',
   'import_positions',
   'list_snapshots',
   'plan_check',
@@ -61,9 +63,11 @@ const REQUIRED_ARGUMENTS: Record<string, string[]> = {
   explain_change: [],
   explore_claiming_ages: [],
   explore_roth_conversions: [],
+  explore_withdrawal_order: [],
   get_briefing: [],
   get_profile: [],
   historical_backtest: [],
+  import_balances: ['asOfDate', 'text'],
   import_positions: ['csv'],
   list_snapshots: [],
   plan_check: [],
@@ -190,7 +194,7 @@ afterAll(async () => {
 })
 
 describe('REQ-MCP-1: plan MCP server tools and strict schemas', () => {
-  it('REQ-MCP-1 lists exactly the twenty-seven plan, portfolio and user data tools, each with a strict input schema', async () => {
+  it('REQ-MCP-1 lists exactly the twenty-nine plan, portfolio and user data tools, each with a strict input schema', async () => {
     const { tools } = await client.listTools()
     expect(tools.map(tool => tool.name).sort()).toEqual(TOOL_NAMES)
     for (const tool of tools) {

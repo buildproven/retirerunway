@@ -38,7 +38,13 @@ import {
   getStandardDeduction,
 } from './tax-brackets'
 import type { FilingStatus } from './tax-brackets'
-import type { AccountType, Portfolio, UserProfile } from './types'
+import type {
+  AccountType,
+  GlidePoint,
+  Portfolio,
+  UserProfile,
+  WithdrawalOrder,
+} from './types'
 
 export const DEFAULT_PLANNING_AGE = 95
 /** First whole age past 59½: tax-deferred and Roth money pays out without the penalty. */
@@ -156,7 +162,7 @@ export function premiumTaxCredit(
     Math.max(0, benchmarkPremium - percentage * Math.max(0, magi))
   )
 }
-export const PROJECTION_MODEL_VERSION = '2.8.0'
+export const PROJECTION_MODEL_VERSION = '2.9.0'
 
 /** IRS Uniform Lifetime Table divisors (2022), ages 75–105. */
 const RMD_DIVISORS: Readonly<Record<number, number>> = {
@@ -314,6 +320,34 @@ interface Context {
   readonly separationAge: number
   readonly conversion: RothConversionStrategy
   readonly conversionEndAge: number
+  readonly withdrawalOrder: WithdrawalOrder
+}
+
+/**
+ * The stock share at an age on a glide path (REQ-MCP-71): straight lines
+ * between points, flat before the first and after the last; `fallback`
+ * (the snapshot's share) when there is no path.
+ */
+export function glideShareAt(
+  path: readonly GlidePoint[] | undefined,
+  age: number,
+  fallback: number
+): number {
+  if (path === undefined || path.length === 0) return fallback
+  const points = [...path].sort((a, b) => a.age - b.age)
+  const first = points[0]
+  const last = points[points.length - 1]
+  if (age <= first.age) return first.equityShare
+  if (age >= last.age) return last.equityShare
+  for (let i = 1; i < points.length; i++) {
+    const b = points[i]
+    if (age <= b.age) {
+      const a = points[i - 1]
+      const t = b.age === a.age ? 1 : (age - a.age) / (b.age - a.age)
+      return a.equityShare + t * (b.equityShare - a.equityShare)
+    }
+  }
+  return last.equityShare
 }
 
 /**
@@ -546,7 +580,9 @@ function employerPlanOpen(ctx: Context, age: number): boolean {
 }
 
 /**
- * Take `amount` beyond the forced payouts, in order: taxable; the employer
+ * Take `amount` beyond the forced payouts. In the default taxableFirst
+ * order (REQ-MCP-70; preTaxFirst swaps the first two steps, proportional
+ * first takes from every open account by balance): taxable; the employer
  * plan when open (60+, or the Rule of 55 after separation), else just its
  * 457(b) part (`employerPlan457`) after separation, which has no 10%
  * penalty at any age; the IRA and Roth from 60; then, still short, the
@@ -586,17 +622,56 @@ function drawDown(
   }
   const free457 = Math.max(0, employerPlan457)
   let used457 = 0
-  take('taxable', false)
-  if (employerPlanOpen(ctx, age)) {
-    // Open: the 457(b) part pays first.
-    used457 = Math.min(free457, take('employerPlan', false))
-  } else if (age >= ctx.separationAge) {
-    used457 = take('employerPlan', false, free457)
+  const planOpen = employerPlanOpen(ctx, age)
+  const iraOpen = age >= PENALTY_FREE_AGE || ownerDeadAt(ctx.profile, age)
+  const preTax = (): void => {
+    if (planOpen) {
+      // Open: the 457(b) part pays first.
+      used457 += Math.min(free457 - used457, take('employerPlan', false))
+    } else if (age >= ctx.separationAge) {
+      used457 += take('employerPlan', false, free457 - used457)
+    }
+    if (iraOpen) take('ira', false)
   }
-  if (age >= PENALTY_FREE_AGE || ownerDeadAt(ctx.profile, age)) {
-    take('ira', false)
-    take('roth', false)
+  if (ctx.withdrawalOrder === 'proportional' && need > 0) {
+    // REQ-MCP-70: every open account pays its share of the balance.
+    const caps: Buckets = {
+      taxable: Math.max(0, left.taxable),
+      employerPlan: planOpen
+        ? Math.max(0, left.employerPlan)
+        : age >= ctx.separationAge
+          ? Math.min(Math.max(0, left.employerPlan), free457)
+          : 0,
+      ira: iraOpen ? Math.max(0, left.ira) : 0,
+      roth: iraOpen ? Math.max(0, left.roth) : 0,
+      nqdc: 0,
+    }
+    const open = caps.taxable + caps.employerPlan + caps.ira + caps.roth
+    if (open > 0) {
+      const share = Math.min(1, need / open)
+      const want: Buckets = {
+        taxable: caps.taxable * share,
+        employerPlan: caps.employerPlan * share,
+        ira: caps.ira * share,
+        roth: caps.roth * share,
+        nqdc: 0,
+      }
+      take('taxable', false, want.taxable)
+      const plan = take('employerPlan', false, want.employerPlan)
+      used457 += Math.min(free457, plan)
+      take('ira', false, want.ira)
+      take('roth', false, want.roth)
+      // Anything left (rounding) falls through to the order below.
+    }
   }
+  if (ctx.withdrawalOrder === 'preTaxFirst') {
+    preTax()
+    take('taxable', false)
+  } else {
+    take('taxable', false)
+    preTax()
+  }
+  if (iraOpen) take('roth', false)
   // Paid out early, with the penalty. NQDC pays only on its schedule.
   take('employerPlan', true)
   take('ira', true)
@@ -1147,6 +1222,8 @@ function contextFor(
     separationAge,
     conversion: options.rothConversion ?? { kind: 'none' },
     conversionEndAge: options.conversionEndAge ?? RMD_START_AGE - 1,
+    withdrawalOrder:
+      options.withdrawalOrder ?? profile.withdrawalOrder ?? 'taxableFirst',
   }
 }
 
@@ -1247,6 +1324,8 @@ export interface ProjectionOptions {
   readonly rothConversion?: RothConversionStrategy
   /** Last age to convert (default 74, the year before RMDs). */
   readonly conversionEndAge?: number
+  /** Overrides the profile's withdrawalOrder (REQ-MCP-70). */
+  readonly withdrawalOrder?: WithdrawalOrder
 }
 
 /**
@@ -1285,7 +1364,8 @@ export function projectRetirement(
       const age = profile.currentAge + i + 1
       const means = meansForYear(profile, i)
       inflation *= 1 + means.inflation
-      const expectedReturn = equity * means.equity + (1 - equity) * means.bond
+      const share = glideShareAt(profile.glidePath, age, equity)
+      const expectedReturn = share * means.equity + (1 - share) * means.bond
       const flow = stepYear(ctx, age, state, inflation, expectedReturn)
       expectedYears.push(toProjectionYear(profile, flow, inflation))
     }
@@ -1309,7 +1389,8 @@ export function projectRetirement(
       const drawnInflation =
         means.inflation + M.INFLATION_STD_DEV * boxMullerNormal(rand)
       inflation *= 1 + Math.max(drawnInflation, 0)
-      const portfolioReturn = equity * equityReturn + (1 - equity) * bondReturn
+      const share = glideShareAt(profile.glidePath, age, equity)
+      const portfolioReturn = share * equityReturn + (1 - share) * bondReturn
       const flow = stepYear(ctx, age, state, inflation, portfolioReturn)
       if (depletedAt === null && flow.shortfall > 1) depletedAt = age
       byYear[i].push(
@@ -1456,12 +1537,13 @@ export function projectSequence(
     const stocks = market?.stocks ?? means.equity
     const bonds = market?.bonds ?? means.bond
     inflation *= 1 + (market?.inflation ?? means.inflation)
+    const share = glideShareAt(profile.glidePath, age, equity)
     const flow = stepYear(
       ctx,
       age,
       state,
       inflation,
-      equity * stocks + (1 - equity) * bonds
+      share * stocks + (1 - share) * bonds
     )
     if (depletionAge === null && flow.shortfall > 1) depletionAge = age
     balanceByAge.push({

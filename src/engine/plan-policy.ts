@@ -6,11 +6,12 @@
 // proposal. Nothing is saved; the owner approves each change.
 import { calculatePortfolioValue } from './portfolio-math'
 import { checkPlan } from './plan-check'
-import { projectRetirement } from './retirement-projection'
+import { glideShareAt, projectRetirement } from './retirement-projection'
 import type {
   Account,
   AccountType,
   CdLadderRule,
+  GlidePoint,
   Holding,
   PlanRules,
   Portfolio,
@@ -32,6 +33,15 @@ export const POLICY_DEFAULTS = {
   /** New-issue CDs and Treasury notes go out to 10 years. */
   maxTermYears: 10,
   saleChunks: 3,
+  /** Bond tent (REQ-MCP-71): stocks this much lower at retirement, back up after tentYears. */
+  tentDip: 0.15,
+  tentYears: 10,
+  /** Rising glide path: this much lower at retirement, this much above target after risingYears. */
+  risingDip: 0.2,
+  risingTop: 0.1,
+  risingYears: 15,
+  minShare: 0.2,
+  maxShare: 0.9,
   unit: 1_000,
   socialSecurityAge: 67,
 } as const
@@ -51,6 +61,15 @@ export interface EquityTestRow {
   readonly successRate: number
   readonly forecastSuccessRate: number
   /** The worse of the two: the score the proposal ranks by. */
+  readonly worse: number
+}
+
+export interface GlideTestRow {
+  readonly name: string
+  /** Empty for a constant share. */
+  readonly points: readonly GlidePoint[]
+  readonly successRate: number
+  readonly forecastSuccessRate: number
   readonly worse: number
 }
 
@@ -89,6 +108,13 @@ export interface PolicyProposal {
   readonly equityTest: {
     readonly rows: readonly EquityTestRow[]
     readonly proposed: number
+    readonly basis: string
+  }
+  /** Constant share vs glide paths (REQ-MCP-71), same seed. */
+  readonly glideTest: {
+    readonly rows: readonly GlideTestRow[]
+    /** The path to save as profile glidePath; null keeps a constant share. */
+    readonly proposed: readonly GlidePoint[] | null
     readonly basis: string
   }
   readonly ladder: PolicyLadder | null
@@ -310,6 +336,125 @@ export function proposePlanPolicy(
     findings[0]?.status === 'keep' && current !== undefined
       ? current.targetEquityShare
       : proposedShare
+
+  // 1b. Glide path (REQ-MCP-71): does a share that changes with age beat
+  // the constant target? Same seed, long-run and forecast returns.
+  const clamp = (v: number) =>
+    round2(
+      Math.min(POLICY_DEFAULTS.maxShare, Math.max(POLICY_DEFAULTS.minShare, v))
+    )
+  const from = profile.currentAge
+  const retire = Math.max(retirementAge, from + 1)
+  const glideCandidates: { name: string; points: GlidePoint[] }[] = [
+    {
+      name: 'Bond tent',
+      points: [
+        { age: from, equityShare: clamp(targetShare) },
+        {
+          age: retire,
+          equityShare: clamp(targetShare - POLICY_DEFAULTS.tentDip),
+        },
+        {
+          age: retire + POLICY_DEFAULTS.tentYears,
+          equityShare: clamp(targetShare),
+        },
+      ],
+    },
+    {
+      name: 'Rising after retirement',
+      points: [
+        { age: from, equityShare: clamp(targetShare) },
+        {
+          age: retire,
+          equityShare: clamp(targetShare - POLICY_DEFAULTS.risingDip),
+        },
+        {
+          age: retire + POLICY_DEFAULTS.risingYears,
+          equityShare: clamp(targetShare + POLICY_DEFAULTS.risingTop),
+        },
+      ],
+    },
+  ]
+  if (profile.glidePath !== undefined && profile.glidePath.length > 0)
+    glideCandidates.unshift({
+      name: 'Your glide path',
+      points: [...profile.glidePath],
+    })
+  const constantTest = withEquityShare(portfolio, targetShare)
+  const noGlide: UserProfile = { ...profile, glidePath: undefined }
+  const scoreGlide = (points: GlidePoint[]) => {
+    const withPath: UserProfile = { ...profile, glidePath: points }
+    const longRun = projectRetirement(portfolio, withPath, run).monteCarlo
+      .successRate
+    const forecast = projectRetirement(
+      portfolio,
+      { ...withPath, marketAssumptions: forecastProfile.marketAssumptions },
+      run
+    ).monteCarlo.successRate
+    return {
+      successRate: longRun,
+      forecastSuccessRate: forecast,
+      worse: Math.min(longRun, forecast),
+    }
+  }
+  const constantRow: GlideTestRow = (() => {
+    const longRun = projectRetirement(constantTest, noGlide, run).monteCarlo
+      .successRate
+    const forecast = projectRetirement(
+      constantTest,
+      { ...noGlide, marketAssumptions: forecastProfile.marketAssumptions },
+      run
+    ).monteCarlo.successRate
+    return {
+      name: `Constant ${pct(targetShare)}`,
+      points: [],
+      successRate: longRun,
+      forecastSuccessRate: forecast,
+      worse: Math.min(longRun, forecast),
+    }
+  })()
+  const glideRows: GlideTestRow[] = [
+    constantRow,
+    ...glideCandidates.map(c => ({
+      name: c.name,
+      points: c.points,
+      ...scoreGlide(c.points),
+    })),
+  ]
+  const bestGlide = glideRows
+    .slice(1)
+    .reduce<
+      GlideTestRow | undefined
+    >((a, b) => (a === undefined || b.worse > a.worse ? b : a), undefined)
+  const glideWins =
+    bestGlide !== undefined &&
+    bestGlide.worse > constantRow.worse + POLICY_DEFAULTS.tieTolerance
+  const proposedGlide =
+    glideWins && bestGlide !== undefined ? bestGlide.points : null
+  const glideBasis =
+    glideWins && bestGlide !== undefined
+      ? `${bestGlide.name} scores ${pct(bestGlide.worse)} on the worse of long-run and forecast returns vs ${pct(constantRow.worse)} for a constant ${pct(targetShare)}`
+      : `no glide path tested beats a constant ${pct(targetShare)} (${pct(constantRow.worse)}) by more than ${POLICY_DEFAULTS.tieTolerance * 100} point`
+  const hasGlide =
+    profile.glidePath !== undefined && profile.glidePath.length > 0
+  if (proposedGlide !== null) {
+    const same = hasGlide && bestGlide?.name === 'Your glide path'
+    findings.push({
+      rule: 'glidePath',
+      status: same ? 'keep' : hasGlide ? 'change' : 'add',
+      ...(hasGlide ? { current: profile.glidePath } : {}),
+      proposed: proposedGlide,
+      reason: `${glideBasis}; saved on the profile (glidePath), and the target each year is the path's share at your age (${pct(glideShareAt(proposedGlide, from, targetShare))} now)`,
+    })
+  } else if (hasGlide) {
+    findings.push({
+      rule: 'glidePath',
+      status: 'change',
+      current: profile.glidePath,
+      proposed: null,
+      reason: `${glideBasis}; remove the glide path and hold the target`,
+    })
+  }
 
   const driftBand = current?.driftBand ?? POLICY_DEFAULTS.driftBand
   if (current?.driftBand === undefined)
@@ -583,6 +728,7 @@ export function proposePlanPolicy(
     socialSecurityAge,
     currentEquityShare: Math.round(actualShare * 10_000) / 10_000,
     equityTest: { rows, proposed: proposedShare, basis },
+    glideTest: { rows: glideRows, proposed: proposedGlide, basis: glideBasis },
     ladder,
     findings,
     changes: findings.filter(f => f.status === 'change' || f.status === 'add')

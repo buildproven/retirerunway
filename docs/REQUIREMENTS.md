@@ -668,6 +668,42 @@ skill records what the owner decides in the plan notes and applies approved
 changes with save_profile, so the plan is reviewed and refined with the owner
 over time.
 
+**Withdrawal order (REQ-MCP-70).** The projection takes spending, after RMDs
+and the deferred-compensation payout and before any penalised early
+withdrawal, in the profile's `withdrawalOrder`: `taxableFirst` (the default:
+taxable, then pre-tax accounts that are open, then Roth), `preTaxFirst`, or
+`proportional` (every open account in proportion to its balance).
+`explore_withdrawal_order` runs the three orders and taxable first with Roth
+conversions filling the 12% bracket on one seed and returns each order's
+success rate, median balance at the planning age, lifetime tax, IRMAA and ACA
+credit, the change against the current order, the best (highest success,
+then median balance, then lowest tax plus IRMAA) and a headline. review_plan
+lists a better order as an owner decision when it adds more than 1 point.
+
+**Glide path (REQ-MCP-71).** The profile's `glidePath` sets the stock share
+by age: straight lines between points, flat before the first and after the
+last; without it the snapshot's share holds every year. propose_plan_rules
+tests a bond tent (the target share now, 15 points lower at retirement, back
+to the target 10 years later), a rising path (20 points lower at retirement,
+10 points above the target 15 years later) and any saved path against the
+constant target, on the worse of long-run and forecast returns, and proposes
+the best path only when it beats the constant share by more than 1 point.
+With a path saved, plan_check measures drift against the path's share at the
+owner's age.
+
+**Balances from an aggregator (REQ-MCP-72).** `import_balances` reads a
+net-worth list pasted from Empower or another aggregator (one account per
+line, name then balance; section headings and their totals recognised and
+not counted twice; a last-updated date read), masks account numbers, sorts
+each line into cash, investment, credit card, loan, mortgage, home or other,
+takes earmarked cash out of free cash, and checks the list against the saved
+plan: card and loan debt over free cash, free cash under 3 months of
+spending, accounts not updated for 30 days, and investments more than 3% from
+the newest positions snapshot or a snapshot over 14 days old. It returns the
+profile changes to propose (planRules.outsideCash, consumerDebt, mortgage
+balance and date, home value) and saves nothing. review_plan reports free
+cash against `consumerDebt` and months of spending.
+
 `spending_guardrails` answers "how much can I spend" in dollars with
 risk-based guardrails on the same model and seed: `canSpend` is the first
 retirement year's spending without the mortgage payment (all spending phases

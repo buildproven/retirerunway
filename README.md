@@ -85,7 +85,9 @@ the skill.
   stocks and proposes the share that holds up best at both long-run and
   forecast returns, a CD or Treasury ladder that funds your first retirement
   years, a cash buffer that starts a year before you retire and the sales to
-  get there, each with its reason. You approve each one.
+  get there, each with its reason. It also tests a stock share that changes
+  with age (a bond tent around retirement, or a share that rises after it)
+  against a constant one. You approve each one.
 - **Your rules, checked.** `plan_check` measures your newest snapshot against
   the rules you set (target stock share, drift band, cash buffer, a sell
   schedule, accounts never to sell from, one-off tasks) and lists what is due,
@@ -100,11 +102,15 @@ the skill.
   cut, a death before retirement) on the same portfolio and seed.
 - **The other questions.** How much can I spend (`spending_guardrails`)? When
   should we claim Social Security (`explore_claiming_ages`)? Do Roth
-  conversions help (`explore_roth_conversions`)? What moved the number since
-  last month (`explain_change`)?
+  conversions help (`explore_roth_conversions`)? Which account should I spend
+  from first (`explore_withdrawal_order`)? What moved the number since last
+  month (`explain_change`)?
 
 Positions import from Fidelity, Schwab, Vanguard or a generic CSV, with
-account numbers removed before anything is saved.
+account numbers removed before anything is saved. Cash, debts and the home
+come from a net-worth list pasted from Empower or another aggregator
+(`import_balances`), with money set aside for college or a tax bill kept out
+of free cash.
 
 ## How it keeps the AI honest
 

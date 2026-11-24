@@ -312,6 +312,16 @@ export interface UserProfile {
    * considering, and how often the plan is reviewed.
    */
   goals?: PlanGoals
+  /**
+   * Stock share by age (REQ-MCP-71): points joined by straight lines, held
+   * flat before the first and after the last. Absent: the snapshot's share
+   * every year.
+   */
+  glidePath?: GlidePoint[]
+  /** Which accounts pay spending first (REQ-MCP-70). Default taxableFirst. */
+  withdrawalOrder?: WithdrawalOrder
+  /** Card and other short-term debt to clear, today's dollars (REQ-MCP-72). */
+  consumerDebt?: number
   planRules?: PlanRules
   /**
    * A survivor scenario (REQ-MCP-48): one spouse dies at deathAge (the
@@ -420,6 +430,22 @@ export interface ScheduledSale {
   /** True once the owner has placed the sale. */
   done?: boolean
 }
+
+/** One point of a stock-share glide path (REQ-MCP-71). */
+export interface GlidePoint {
+  age: number
+  /** Share of the portfolio in stocks at this age, 0–1. */
+  equityShare: number
+}
+
+/**
+ * Order the accounts pay spending in (REQ-MCP-70), always after RMDs and the
+ * NQDC payout and before any penalised early withdrawal:
+ * - taxableFirst: taxable, then pre-tax (401(k) when open, IRA from 60), then Roth.
+ * - preTaxFirst: pre-tax, then taxable, then Roth.
+ * - proportional: from every open account at once, in proportion to balances.
+ */
+export type WithdrawalOrder = 'taxableFirst' | 'preTaxFirst' | 'proportional'
 
 /** The owner's portfolio rules that plan_check measures the snapshot against. */
 export interface PlanRules {

@@ -256,6 +256,21 @@ route allows 60 seconds. The loop: the monthly runway check calls
 decisions to the notes and the approved changes to the profile; the next
 review starts from them. See ADR-010.
 
+### 2.z Withdrawal order, glide path and balances (REQ-MCP-70..72)
+
+`drawDown` in `src/engine/retirement-projection.ts` takes the order from the
+context (options, then profile, then `taxableFirst`); `glideShareAt` sets
+each year's blended return from the profile's `glidePath` in the expected
+path, the Monte Carlo and `projectSequence`, so every tool that projects
+follows the owner's saved path and order. Both default to the old behaviour,
+so results without them are unchanged (model 2.9.0).
+`src/engine/withdrawal-order.ts` runs the orders on one seed;
+`proposePlanPolicy` scores the glide candidates beside the share test; and
+`src/engine/balance-sheet.ts` parses the pasted list without network or
+storage, with `compareWithPlan` adding the checks against the saved profile
+and snapshot. review_plan calls the order explorer too, about 5 more
+projections. See ADR-011.
+
 ## 3. The planner pipeline (FR-01..FR-12)
 
 1. **Intake** (`intake.ts`) validates form values and builds an immutable

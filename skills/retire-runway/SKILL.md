@@ -248,6 +248,42 @@ one (where it is raised 10%), each with its chance of success before and
 after. The levels are for today: run it again monthly or after a big market
 move.
 
+## Balances from Empower: import_balances
+
+When the owner pastes balances (Empower's net-worth page or any list of
+accounts with amounts), call `import_balances` with the text, today's
+`asOfDate`, and any cash the owner sets aside (`earmarks`: account, amount,
+purpose, such as college money). Report the totals (free cash after
+earmarks, debts, net worth) and the checks as written: card debt over free
+cash, months of spending in free cash, accounts not updated for 30 days, and
+investments that differ from the positions snapshot (then ask for a fresh
+positions CSV). Show each of `proposedChanges` and save only the ones the
+owner approves with `save_profile`. Holdings still come from a positions CSV.
+
+## Withdrawal order and glide path
+
+- For "which account do I spend first", call `explore_withdrawal_order` and
+  report the headline, the best order and its change against the current
+  order. Save the owner's choice as profile `withdrawalOrder`.
+- `propose_plan_rules` also tests a stock share that changes with age
+  (`glideTest`: a bond tent that dips at retirement and comes back, and a
+  share that rises after retirement) against a constant share, on the worse
+  of long-run and forecast returns. When it proposes a path, present it as a
+  finding; save it as profile `glidePath` only on the owner's yes. With a
+  path saved, `plan_check` measures drift against the path's share at the
+  owner's age.
+
+## Moves and other real options as levers (Lifescape)
+
+When the owner is weighing a move, and the Lifescape tools are connected,
+use them for the town facts: compare the finalists or explain a town whose
+evidence the owner has approved. Turn each finalist into a
+`rank_levers` custom lever with the profile changes the owner confirms: a
+`homeSale` (sale price, replacement home cost, `annualHousingCostChange`),
+the new `stateTaxRate` and `stateExemptsRetirementIncome`, and any change to
+spending. Name the lever after the town. Never take a figure from Lifescape
+that the owner has not approved, and never estimate one; ask instead.
+
 ## Roth conversions: explore_roth_conversions
 
 For "should I convert, and how much", call `explore_roth_conversions`. It runs
@@ -458,6 +494,12 @@ Portfolio tools (holdings and tax strategy):
   that trigger a cut or a raise.
 - `explore_roth_conversions`: conversion strategies side by side, with IRMAA
   and the ACA line, and the yearly amounts.
+- `explore_withdrawal_order`: which accounts pay spending first (taxable
+  first, pre-tax first, proportional, or taxable first with 12% bracket
+  conversions), side by side.
+- `import_balances`: the net-worth list pasted from Empower or another
+  aggregator, read into cash, investments, debts and home, with earmarks,
+  checks and profile changes to propose; nothing is saved.
 
 User data tools (the owner's saved profile and snapshots, kept by the hosted
 server):

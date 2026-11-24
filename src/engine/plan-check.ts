@@ -5,6 +5,7 @@
 // Nothing here trades; the owner places every order.
 import { CdLadderError, planCdLadder, type CdLadderPlan } from './cd-ladder'
 import { baseExpensesAt, isLiquidAccount } from './portfolio-math'
+import { glideShareAt } from './retirement-projection'
 import type {
   Account,
   AccountType,
@@ -402,7 +403,12 @@ export function checkPlan(
   if (totalValue <= 0)
     throw new PlanCheckError('portfolio', 'has no value to measure')
 
-  const target = rules.targetEquityShare
+  // REQ-MCP-71: with a glide path saved, the target is its share at your age.
+  const target = glideShareAt(
+    profile.glidePath,
+    profile.currentAge,
+    rules.targetEquityShare
+  )
   const equityShare = equityValue / totalValue
   const drift = equityShare - target
   const excessEquity = equityValue - target * totalValue

@@ -7,6 +7,7 @@ import { proposePlanPolicy } from './plan-policy'
 import { planVerdict, type PlanVerdict } from './plan-verdict'
 import { goalsOf, rankLevers, type LeverRanking } from './retirement-timing'
 import type { Portfolio, UserProfile } from './types'
+import { exploreWithdrawalOrders } from './withdrawal-order'
 
 export const REVIEW_DEFAULTS = {
   reviewEveryDays: 30,
@@ -14,6 +15,10 @@ export const REVIEW_DEFAULTS = {
   topLevers: 5,
   /** Pre-tax money above this share makes Roth conversions worth a professional check. */
   preTaxShareForRothCheck: 0.7,
+  /** A withdrawal order this many points better than the current one is a decision. */
+  orderGain: 0.01,
+  /** Free cash under this many months of spending is flagged. */
+  minCashMonths: 3,
 } as const
 
 export interface HumanCheck {
@@ -51,6 +56,18 @@ export interface PlanReview {
   readonly ownerDecisions: readonly string[]
   /** What a human professional should check before the plan is final. */
   readonly humanChecks: readonly HumanCheck[]
+  /** Which accounts to spend from first (REQ-MCP-70). */
+  readonly withdrawalOrder: {
+    readonly current: string
+    readonly best: string
+    readonly headline: string
+  }
+  /** Free cash against card debt and spending (REQ-MCP-72). */
+  readonly liquidity: {
+    readonly outsideCash: number | null
+    readonly consumerDebt: number | null
+    readonly monthsOfSpending: number | null
+  }
   readonly nextReviewDate: string
 }
 
@@ -160,6 +177,7 @@ export function reviewPlan(
   const verdict = planVerdict(portfolio, profile, asOfDate, options)
   const ranking = rankLevers(portfolio, profile, options)
   const policy = proposePlanPolicy(portfolio, profile, asOfDate, options)
+  const orders = exploreWithdrawalOrders(portfolio, profile, undefined, options)
   const goals = goalsOf(profile)
   const earliest = ranking.baseline.earliestAge
   const target = profile.targetRetirementAge
@@ -213,6 +231,27 @@ export function reviewPlan(
     )
   for (const f of policy.findings.filter(f => f.status === 'needs_input'))
     ownerDecisions.push(`Give ${f.rule}: ${f.reason}`)
+  const bestOrder = orders.orders.find(o => o.name === orders.best)
+  if (
+    bestOrder !== undefined &&
+    bestOrder.vsCurrent.successRate > REVIEW_DEFAULTS.orderGain
+  )
+    ownerDecisions.push(`Withdrawal order: ${orders.headline}`)
+  const outsideCash = profile.planRules?.outsideCash
+  const debt = profile.consumerDebt
+  const monthly = profile.annualExpenses / 12
+  const months =
+    outsideCash === undefined || monthly <= 0
+      ? null
+      : Math.round((outsideCash / monthly) * 10) / 10
+  if (debt !== undefined && outsideCash !== undefined && debt > outsideCash)
+    ownerDecisions.push(
+      `Card and loan debt $${Math.round(debt).toLocaleString('en-US')} is more than free cash $${Math.round(outsideCash).toLocaleString('en-US')}: decide the payoff plan before buying anything long-term`
+    )
+  if (months !== null && months < REVIEW_DEFAULTS.minCashMonths)
+    dataToRefresh.push(
+      `Free cash covers ${months} months of spending: build it to ${REVIEW_DEFAULTS.minCashMonths} or more before locking money into CDs; check with import_balances when balances change`
+    )
 
   // Next review: the cadence, or sooner when something is due before it.
   const every =
@@ -273,6 +312,16 @@ export function reviewPlan(
     dataToRefresh,
     ownerDecisions,
     humanChecks: humanChecksFor(portfolio, profile),
+    withdrawalOrder: {
+      current: orders.current,
+      best: orders.best,
+      headline: orders.headline,
+    },
+    liquidity: {
+      outsideCash: outsideCash ?? null,
+      consumerDebt: debt ?? null,
+      monthsOfSpending: months,
+    },
     nextReviewDate: isoOf(nextReview),
   }
 }

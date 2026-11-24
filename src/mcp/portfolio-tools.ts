@@ -27,6 +27,13 @@ import { explainChange } from '../engine/change-explainer'
 import { VERDICT_THRESHOLDS, planVerdict } from '../engine/plan-verdict'
 import { POLICY_DEFAULTS, proposePlanPolicy } from '../engine/plan-policy'
 import { REVIEW_DEFAULTS, reviewPlan } from '../engine/plan-review'
+import { exploreWithdrawalOrders } from '../engine/withdrawal-order'
+import {
+  BALANCE_DEFAULTS,
+  BalanceSheetError,
+  compareWithPlan,
+  readBalanceSheet,
+} from '../engine/balance-sheet'
 import {
   TIMING_DEFAULTS,
   earliestRetirement,
@@ -50,6 +57,7 @@ import type { NamedStrategy } from '../engine/roth-conversion-explorer'
 import { getFederalBrackets } from '../engine/tax-brackets'
 import {
   ACA_SUBSIDY_CLIFF,
+  PROJECTION_MODEL_VERSION,
   CLIFF_MARGIN,
   EARLY_WITHDRAWAL_PENALTY,
   PENALTY_FREE_AGE,
@@ -92,6 +100,8 @@ import {
   earliestRetirementInput,
   rankLeversInput,
   reviewPlanInput,
+  exploreWithdrawalOrderInput,
+  importBalancesInput,
   explainChangeInput,
   portfolioAnalysisInput,
   projectRetirementInput,
@@ -1348,7 +1358,7 @@ export function registerPortfolioTools(server: McpServer): void {
     {
       title: 'Review the plan',
       description:
-        "The plan review, for every monthly check and whenever the owner asks where the plan stands. On asOfDate (pass today's date) it returns: the verdict and its measures (plan_verdict), when the owner can retire against the target (earliest age that reaches the goals), the top levers and the best of them together (rank_levers), how many rule changes propose_plan_rules suggests, the actions due from the owner's rules, data to refresh, the decisions only the owner can make, what a human professional should check (fee-only planner, CPA, healthcare quote, Social Security records, estate attorney), and the next review date. Changes nothing. Takes up to half a minute.",
+        "The plan review, for every monthly check and whenever the owner asks where the plan stands. On asOfDate (pass today's date) it returns: the verdict and its measures (plan_verdict), when the owner can retire against the target (earliest age that reaches the goals), the top levers and the best of them together (rank_levers), how many rule changes propose_plan_rules suggests, the actions due from the owner's rules, data to refresh, the decisions only the owner can make, what a human professional should check (fee-only planner, CPA, healthcare quote, Social Security records, estate attorney), the best withdrawal order against the current one, free cash against card debt and months of spending, and the next review date. Changes nothing. Takes up to half a minute.",
       inputSchema: reviewPlanInput,
     },
     async args => {
@@ -1375,8 +1385,122 @@ export function registerPortfolioTools(server: McpServer): void {
             assumptions: {
               asOfDate,
               snapshotDate: portfolio.asOfDate,
-              tools: ['plan_verdict', 'rank_levers', 'propose_plan_rules'],
+              tools: [
+                'plan_verdict',
+                'rank_levers',
+                'propose_plan_rules',
+                'explore_withdrawal_order',
+              ],
               review: REVIEW_DEFAULTS,
+              nothingSaved: true,
+              ...savedAssumption(savedData),
+            },
+          }
+        ),
+      })
+    }
+  )
+
+  // REQ-MCP-70: which accounts to spend from first.
+  server.registerTool(
+    'explore_withdrawal_order',
+    {
+      title: 'Explore the withdrawal order',
+      description:
+        "Which accounts should pay spending first? Runs the plan (v2 model, same portfolio, profile and seed) with four orders: taxable first (the default), pre-tax first, proportional (every open account by balance), and taxable first while Roth conversions fill the 12% bracket. RMDs and the NQDC payout always come first and penalised early withdrawals last. Returns, per order: success rate, median balance at the planning age, lifetime tax, IRMAA, ACA credit and Roth converted, and the change against the current order (profile withdrawalOrder); the best order (highest success, then median balance, then lowest tax plus IRMAA), a headline, and two charts (charts.successRates, charts.lifetimeCosts). Save the owner's choice as profile withdrawalOrder. Every figure is in today's dollars.",
+      inputSchema: exploreWithdrawalOrderInput,
+    },
+    async args => {
+      const inputs = await resolveInputs('explore_withdrawal_order', args)
+      if (!inputs.ok) return errorResult(inputs.errors)
+      const { portfolio, profile, savedData } = inputs
+      const errors = portfolioErrors(
+        AnalyzeRequestSchema,
+        { portfolio, userProfile: profile },
+        portfolio
+      )
+      if (errors.length > 0) return errorResult(errors)
+      const seed = args.seed ?? MONTE_CARLO_DEFAULTS.DEFAULT_SEED
+      const result = exploreWithdrawalOrders(portfolio, profile, undefined, {
+        seed,
+      })
+      return jsonResult({
+        ...result,
+        provenance: stamp(
+          'explore_withdrawal_order',
+          { ...args, portfolio, profile },
+          result,
+          {
+            seed,
+            assumptions: {
+              snapshotDate: portfolio.asOfDate,
+              model: `project_retirement ${PROJECTION_MODEL_VERSION}`,
+              dollars: "today's dollars",
+              ...savedAssumption(savedData),
+            },
+          }
+        ),
+      })
+    }
+  )
+
+  // REQ-MCP-72: the balance sheet from an aggregator's net-worth list.
+  server.registerTool(
+    'import_balances',
+    {
+      title: 'Import balances (Empower or any net-worth list)',
+      description:
+        "Read the owner's net-worth list as pasted from Empower or another aggregator (one account per line: name then balance; section headings such as Cash, Investments, Credit Cards, Mortgages and their totals are recognised and not double counted; a 'last updated' date is read). Pass asOfDate (today) and earmarks for cash set aside for a purpose (account, amount, purpose: college, a tax bill). Returns each line sorted into cash, investment, credit card, loan, mortgage, home or other, with account numbers masked; totals (cash, earmarked, free cash, investments, debts, home, net worth); checks against the saved plan (card debt over free cash, months of spending in free cash, accounts not updated for 30 days, investments that differ from the newest positions snapshot); and proposedChanges for save_profile (planRules.outsideCash, consumerDebt, mortgage balance, home value). Nothing is saved: show the changes and save only what the owner approves. Holdings still come from a positions CSV (import_positions).",
+      inputSchema: importBalancesInput,
+    },
+    async args => {
+      let sheet: ReturnType<typeof readBalanceSheet>
+      try {
+        sheet = readBalanceSheet(args.text, args.asOfDate, args.earmarks ?? [])
+      } catch (error) {
+        if (!(error instanceof BalanceSheetError)) throw error
+        return errorResult([{ field: error.field, message: error.message }])
+      }
+      const opened = await fromStore(async () =>
+        openDataStore('import_balances')
+      )
+      let profile: UserProfile | undefined
+      let snapshot: { asOfDate: string; totalValue: number } | undefined
+      const savedData: SavedData = {}
+      if (opened.ok) {
+        const readProfile = await fromStore(() => opened.value.readProfile())
+        if (readProfile.ok && readProfile.value !== undefined) {
+          profile = readProfile.value.profile
+          savedData.profile = {
+            file: readProfile.value.file,
+            updatedAt: readProfile.value.updatedAt,
+          }
+        }
+        const readSnapshot = await fromStore(() =>
+          opened.value.newestSnapshot()
+        )
+        if (readSnapshot.ok && readSnapshot.value !== undefined) {
+          snapshot = {
+            asOfDate: readSnapshot.value.portfolio.asOfDate,
+            totalValue: calculatePortfolioValue(readSnapshot.value.portfolio),
+          }
+          savedData.portfolio = {
+            file: readSnapshot.value.file,
+            asOfDate: readSnapshot.value.portfolio.asOfDate,
+          }
+        }
+      }
+      const result = compareWithPlan(sheet, profile, snapshot)
+      return jsonResult({
+        ...result,
+        provenance: stamp(
+          'import_balances',
+          { ...args, profile, snapshot },
+          result,
+          {
+            assumptions: {
+              asOfDate: args.asOfDate,
+              checks: BALANCE_DEFAULTS,
               nothingSaved: true,
               ...savedAssumption(savedData),
             },

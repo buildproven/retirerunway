@@ -4,7 +4,7 @@
       "id": "FR-01",
       "title": "Plan intake without prefilled values",
       "status": "implemented",
-      "design": "DESIGN.md §3.1",
+      "design": "DESIGN.md \u00a73.1",
       "code": [
         "src/engine/plan/intake.ts",
         "src/components/plan-intake-step.tsx"
@@ -20,7 +20,7 @@
       "id": "FR-02",
       "title": "Year-by-year projection kernel",
       "status": "implemented",
-      "design": "DESIGN.md §3.2",
+      "design": "DESIGN.md \u00a73.2",
       "code": ["src/engine/plan/projection.ts", "src/engine/plan/types.ts"],
       "tests": ["src/engine/plan/__tests__/projection.test.ts"]
     },
@@ -28,7 +28,7 @@
       "id": "FR-03",
       "title": "Account access rules and withdrawal ordering",
       "status": "implemented",
-      "design": "DESIGN.md §3.2",
+      "design": "DESIGN.md \u00a73.2",
       "code": ["src/engine/plan/projection.ts", "src/engine/rule-of-55.ts"],
       "tests": [
         "src/engine/plan/__tests__/projection.test.ts",
@@ -40,7 +40,7 @@
       "id": "FR-04",
       "title": "Tax calculation",
       "status": "implemented",
-      "design": "DESIGN.md §3.2",
+      "design": "DESIGN.md \u00a73.2",
       "code": ["src/engine/tax-brackets.ts", "src/engine/plan/projection.ts"],
       "tests": [
         "src/engine/__tests__/tax-brackets.test.ts",
@@ -52,7 +52,7 @@
       "id": "FR-05",
       "title": "Social Security",
       "status": "implemented",
-      "design": "DESIGN.md §3.2, §4",
+      "design": "DESIGN.md \u00a73.2, \u00a74",
       "code": ["src/engine/plan/social-security.ts"],
       "tests": ["src/engine/plan/__tests__/social-security.test.ts"]
     },
@@ -60,7 +60,7 @@
       "id": "FR-06",
       "title": "Healthcare and ACA",
       "status": "implemented",
-      "design": "DESIGN.md §3.2, §4",
+      "design": "DESIGN.md \u00a73.2, \u00a74",
       "code": ["src/engine/plan/healthcare.ts"],
       "tests": ["src/engine/plan/__tests__/healthcare.test.ts"],
       "adr": ["ADR-004", "ADR-006"]
@@ -69,7 +69,7 @@
       "id": "FR-07",
       "title": "Deterministic stress suite",
       "status": "implemented",
-      "design": "DESIGN.md §3.3",
+      "design": "DESIGN.md \u00a73.3",
       "code": ["src/engine/plan/stress-scenarios.ts"],
       "tests": ["src/engine/plan/__tests__/stress-scenarios.test.ts"]
     },
@@ -77,7 +77,7 @@
       "id": "FR-08",
       "title": "Outcome-based verdict",
       "status": "implemented",
-      "design": "DESIGN.md §3.4",
+      "design": "DESIGN.md \u00a73.4",
       "code": ["src/engine/plan/verdict.ts", "src/engine/plan/analyze.ts"],
       "tests": [
         "src/engine/plan/__tests__/verdict.test.ts",
@@ -88,7 +88,7 @@
       "id": "FR-09",
       "title": "Minimum outside-income solver",
       "status": "implemented",
-      "design": "DESIGN.md §3.5",
+      "design": "DESIGN.md \u00a73.5",
       "code": ["src/engine/plan/income-solver.ts"],
       "tests": ["src/engine/plan/__tests__/income-solver.test.ts"]
     },
@@ -96,7 +96,7 @@
       "id": "FR-10",
       "title": "Housing and life events",
       "status": "implemented",
-      "design": "DESIGN.md §3.3",
+      "design": "DESIGN.md \u00a73.3",
       "code": [
         "src/engine/plan/stress-scenarios.ts",
         "src/engine/plan/projection.ts",
@@ -111,7 +111,7 @@
       "id": "FR-11",
       "title": "Plan comparison",
       "status": "implemented",
-      "design": "DESIGN.md §3.6",
+      "design": "DESIGN.md \u00a73.6",
       "code": [
         "src/engine/plan/analysis-delta.ts",
         "src/components/plan-results-step.tsx"
@@ -125,7 +125,7 @@
       "id": "FR-12",
       "title": "Regression fixtures",
       "status": "implemented",
-      "design": "DESIGN.md §3.7",
+      "design": "DESIGN.md \u00a73.7",
       "code": ["src/engine/plan/regression-fixtures.ts"],
       "tests": ["src/engine/plan/__tests__/regression-fixtures.test.ts"]
     },
@@ -133,7 +133,7 @@
       "id": "FR-13",
       "title": "Portfolio import",
       "status": "implemented",
-      "design": "DESIGN.md §6",
+      "design": "DESIGN.md \u00a76",
       "code": [
         "src/engine/csv-parser.ts",
         "src/engine/plaid-mapper.ts",
@@ -157,7 +157,7 @@
       "id": "FR-14",
       "title": "Portfolio analysis tools",
       "status": "implemented",
-      "design": "DESIGN.md §1",
+      "design": "DESIGN.md \u00a71",
       "code": [
         "src/engine/scenarios.ts",
         "src/engine/monte-carlo.ts",
@@ -205,7 +205,7 @@
       "id": "FR-15",
       "title": "AI narration (BYOK)",
       "status": "implemented",
-      "design": "DESIGN.md §2, §6",
+      "design": "DESIGN.md \u00a72, \u00a76",
       "code": [
         "src/ai",
         "src/app/api/narrate",
@@ -223,7 +223,7 @@
       "id": "FR-16",
       "title": "Reports",
       "status": "implemented",
-      "design": "DESIGN.md §5",
+      "design": "DESIGN.md \u00a75",
       "code": ["src/engine/report-generator.ts"],
       "tests": ["src/engine/__tests__/report-generator.test.ts"]
     },
@@ -231,7 +231,7 @@
       "id": "FR-17",
       "title": "Optional persistence and sync",
       "status": "implemented",
-      "design": "DESIGN.md §6",
+      "design": "DESIGN.md \u00a76",
       "code": [
         "src/lib/supabase",
         "src/store/portfolio-store.ts",
@@ -262,7 +262,7 @@
       "id": "FR-18",
       "title": "Public API v1",
       "status": "implemented",
-      "design": "DESIGN.md §2",
+      "design": "DESIGN.md \u00a72",
       "code": ["src/app/api/v1", "src/lib/api-key-auth.ts"],
       "tests": [
         "src/app/api/v1/analyze/__tests__/route.test.ts",
@@ -274,7 +274,7 @@
       "id": "FR-19",
       "title": "Agent skill",
       "status": "implemented",
-      "design": "DESIGN.md §2",
+      "design": "DESIGN.md \u00a72",
       "code": ["skills/retire-runway/scripts", "skills/retire-runway/SKILL.md"],
       "tests": [
         "skills/retire-runway/scripts/__tests__/bundle-once.test.ts",
@@ -288,7 +288,7 @@
       "id": "FR-20",
       "title": "Marketing, legal and trust pages",
       "status": "implemented",
-      "design": "DESIGN.md §7",
+      "design": "DESIGN.md \u00a77",
       "code": [
         "src/app/page.tsx",
         "src/app/about",
@@ -308,7 +308,7 @@
       "id": "FR-21",
       "title": "Plan outputs: bridge, milestones, lifetime chart, export",
       "status": "implemented",
-      "design": "DESIGN.md §3",
+      "design": "DESIGN.md \u00a73",
       "code": [
         "src/engine/plan/summary.ts",
         "src/components/plan-lifetime-chart.tsx",
@@ -323,7 +323,7 @@
       "id": "FR-22",
       "title": "Plan Monte Carlo (chance of success)",
       "status": "implemented",
-      "design": "DESIGN.md §3",
+      "design": "DESIGN.md \u00a73",
       "code": [
         "src/engine/plan/monte-carlo.ts",
         "src/engine/plan/monte-carlo.worker.ts",
@@ -340,7 +340,7 @@
       "id": "FR-23",
       "title": "Plan MCP server",
       "status": "implemented",
-      "design": "DESIGN.md §2",
+      "design": "DESIGN.md \u00a72",
       "code": [
         "src/mcp/server.ts",
         "src/mcp/schemas.ts",
@@ -385,7 +385,9 @@
         "src/lib/ssrf-protection.ts",
         "src/engine/plan-policy.ts",
         "src/engine/retirement-timing.ts",
-        "src/engine/plan-review.ts"
+        "src/engine/plan-review.ts",
+        "src/engine/withdrawal-order.ts",
+        "src/engine/balance-sheet.ts"
       ],
       "tests": [
         "src/mcp/__tests__/server.test.ts",
@@ -432,14 +434,17 @@
         "src/engine/__tests__/cd-ladder.test.ts",
         "src/lib/__tests__/ssrf-protection.test.ts",
         "src/engine/__tests__/plan-policy.test.ts",
-        "src/engine/__tests__/retirement-timing.test.ts"
+        "src/engine/__tests__/retirement-timing.test.ts",
+        "src/engine/__tests__/balance-sheet.test.ts",
+        "src/engine/__tests__/withdrawal-glide.test.ts",
+        "src/mcp/__tests__/balances-orders-tool.test.ts"
       ]
     },
     {
       "id": "NFR-01",
       "title": "Determinism",
       "status": "implemented",
-      "design": "DESIGN.md §5",
+      "design": "DESIGN.md \u00a75",
       "code": [
         "src/engine/stable-id.ts",
         "src/engine/monte-carlo.ts",
@@ -462,7 +467,7 @@
       "id": "NFR-02",
       "title": "Privacy (local-first)",
       "status": "implemented",
-      "design": "DESIGN.md §1",
+      "design": "DESIGN.md \u00a71",
       "code": [
         "src/engine",
         "src/app/privacy/page.tsx",
@@ -480,7 +485,7 @@
       "id": "NFR-03",
       "title": "API security",
       "status": "implemented",
-      "design": "DESIGN.md §2",
+      "design": "DESIGN.md \u00a72",
       "code": [
         "src/lib/rate-limiter.ts",
         "src/lib/with-rate-limit.ts",
@@ -513,7 +518,7 @@
       "id": "NFR-04",
       "title": "Regulatory posture",
       "status": "implemented",
-      "design": "DESIGN.md §7",
+      "design": "DESIGN.md \u00a77",
       "code": [
         "src/components/financial-disclaimer.tsx",
         "src/app/terms/page.tsx",
@@ -525,7 +530,7 @@
       "id": "NFR-05",
       "title": "Billing off by default",
       "status": "implemented",
-      "design": "DESIGN.md §7",
+      "design": "DESIGN.md \u00a77",
       "code": [
         "src/lib/subscription-access.ts",
         "src/store/subscription-store.ts",
@@ -546,7 +551,7 @@
       "id": "NFR-06",
       "title": "Accessibility",
       "status": "implemented",
-      "design": "DESIGN.md §8",
+      "design": "DESIGN.md \u00a78",
       "code": ["src/components", "src/app/page.tsx"],
       "tests": ["tests/accessibility.test.js"]
     },
@@ -554,7 +559,7 @@
       "id": "NFR-07",
       "title": "Supply chain and delivery gates",
       "status": "implemented",
-      "design": "DESIGN.md §8",
+      "design": "DESIGN.md \u00a78",
       "code": [
         "scripts/security-audit.js",
         "scripts/security-audit.sh",
@@ -586,7 +591,7 @@
       "id": "NFR-08",
       "title": "Deployment readiness",
       "status": "implemented",
-      "design": "DESIGN.md §8",
+      "design": "DESIGN.md \u00a78",
       "code": [
         "scripts/production-readiness.js",
         "scripts/launch-smoke.js",
@@ -603,7 +608,7 @@
       "id": "NFR-09",
       "title": "Traceability",
       "status": "implemented",
-      "design": "DESIGN.md §8",
+      "design": "DESIGN.md \u00a78",
       "code": ["scripts/check-traceability.js", "docs/traceability.json"],
       "tests": ["scripts/__tests__/check-traceability.test.ts"]
     },
@@ -611,7 +616,7 @@
       "id": "DEF-01",
       "title": "Multi-currency with dated FX",
       "status": "out-of-scope",
-      "design": "REQUIREMENTS.md §4",
+      "design": "REQUIREMENTS.md \u00a74",
       "code": [],
       "tests": [],
       "issue": "BUI-503",
@@ -621,7 +626,7 @@
       "id": "DEF-02",
       "title": "International packs",
       "status": "out-of-scope",
-      "design": "REQUIREMENTS.md §4",
+      "design": "REQUIREMENTS.md \u00a74",
       "code": [],
       "tests": [],
       "issue": "BUI-504",
@@ -631,7 +636,7 @@
       "id": "DEF-03",
       "title": "Divorce scenario; penalised early-withdrawal modelling",
       "status": "out-of-scope",
-      "design": "REQUIREMENTS.md §4",
+      "design": "REQUIREMENTS.md \u00a74",
       "code": [],
       "tests": [],
       "issue": "BUI-496",
@@ -641,7 +646,7 @@
       "id": "DEF-04",
       "title": "Paid tier, checkout, feature gating",
       "status": "out-of-scope",
-      "design": "REQUIREMENTS.md §4",
+      "design": "REQUIREMENTS.md \u00a74",
       "code": [],
       "tests": [],
       "issue": "BUI-526",
@@ -651,7 +656,7 @@
       "id": "DEF-05",
       "title": "Live execution, advisor tier, native mobile",
       "status": "out-of-scope",
-      "design": "REQUIREMENTS.md §4",
+      "design": "REQUIREMENTS.md \u00a74",
       "code": [],
       "tests": [],
       "note": "Out of scope"
@@ -660,7 +665,7 @@
       "id": "DEF-06",
       "title": "Headless application contract and plan CLI (agent-first)",
       "status": "out-of-scope",
-      "design": "REQUIREMENTS.md §4",
+      "design": "REQUIREMENTS.md \u00a74",
       "code": [],
       "tests": [],
       "issue": "BUI-823",

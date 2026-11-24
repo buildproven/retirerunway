@@ -122,7 +122,7 @@ describe('REQ-MCP-39: project_retirement uses the saved data', () => {
       profile: { file: 'profile.json' },
       portfolio: { asOfDate: '2026-11-17' },
     })
-    expect(assumptions.modelVersion).toBe('2.8.0')
+    expect(assumptions.modelVersion).toBe('2.9.0')
     expect(assumptions.bothSpousesLiveToPlanningAge).toBe(true)
   })
 

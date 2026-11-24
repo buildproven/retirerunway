@@ -90,12 +90,13 @@ Ahead:
 
 Behind, and the roadmap:
 
-1. No live account link: balances come from a positions CSV. Next: import the
-   Empower net-worth export (cash, debts, home) alongside the CSV.
-2. Withdrawal order is fixed by the model, not optimised.
-3. The stock-share test holds the share constant; no rising glide path after
-   retirement.
+1. No live account link: holdings come from a positions CSV and cash, debts
+   and the home from a pasted net-worth list (`import_balances`, v1.4.0).
+2. Withdrawal order: four orders are compared (`explore_withdrawal_order`,
+   v1.4.0), not a full year-by-year optimiser.
+3. Glide paths: a bond tent and a rising share are tested against a constant
+   share (v1.4.0); the candidate set is small.
 4. No consumption-smoothing view (the economics approach that sets spending
    to use the money evenly over life).
-5. Moves to another town are custom levers the owner enters; Lifescape can
-   supply the figures.
+5. Moves to another town are custom levers; the skill takes the town facts
+   from Lifescape (owner-approved evidence only).
