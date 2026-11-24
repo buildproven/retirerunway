@@ -500,6 +500,15 @@ export const userProfileSchema = z.strictObject({
   householdSize: finite.optional(),
   // REQ-MCP-47: the owner's portfolio rules, read by plan_check only.
   planRules: planRulesSchema.optional(),
+  // REQ-MCP-68: the owner's goals for the plan.
+  goals: z
+    .strictObject({
+      successRate: finite.min(0.5).max(0.99).optional(),
+      forecastSuccessRate: finite.min(0.3).max(0.99).optional(),
+      latestAge: finite.min(40).max(80).optional(),
+      reviewEveryDays: z.number().int().min(7).max(366).optional(),
+    })
+    .optional(),
   // REQ-MCP-51: near-term market means (preset 'forecast' or your own), then long-run.
   marketAssumptions: z
     .strictObject({
@@ -675,6 +684,37 @@ export const historicalBacktestInput = z.strictObject({
 })
 
 // REQ-MCP-56: one GO / CAUTION / DELAY verdict for the month.
+// REQ-MCP-66: the earliest retirement age that reaches the goals.
+export const earliestRetirementInput = z.strictObject({
+  profile: userProfileSchema.optional(),
+  portfolio: portfolioSchema.optional(),
+  seed: z.number().int().optional(),
+})
+
+// REQ-MCP-67: the levers that bring retirement forward, ranked.
+export const rankLeversInput = z.strictObject({
+  profile: userProfileSchema.optional(),
+  portfolio: portfolioSchema.optional(),
+  seed: z.number().int().optional(),
+  custom: z
+    .array(
+      z.strictObject({
+        name: z.string().trim().min(1).max(60),
+        changes: userProfileSchema.partial(),
+      })
+    )
+    .max(4)
+    .optional(),
+})
+
+// REQ-MCP-69: the plan review.
+export const reviewPlanInput = z.strictObject({
+  profile: userProfileSchema.optional(),
+  portfolio: portfolioSchema.optional(),
+  asOfDate: isoDate.optional(),
+  seed: z.number().int().optional(),
+})
+
 // REQ-MCP-64: the engine's proposed plan rules.
 export const proposePlanRulesInput = z.strictObject({
   profile: userProfileSchema.optional(),

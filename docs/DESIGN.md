@@ -241,6 +241,21 @@ sell schedule comes from `checkPlan` run with the proposed rules. The MCP tool
 save: the tool never writes, the skill walks the owner through each finding,
 and only save_profile persists a rule. See ADR-009.
 
+### 2.y Retire as early as is safe: timing, levers and the review loop (REQ-MCP-66..69)
+
+`src/engine/retirement-timing.ts` holds `retireAt` (the profile retiring at
+another age), `earliestRetirement` (a full scan of ages), `earliestBySearch`
+(bisection) and `rankLevers`. `src/engine/plan-review.ts` composes
+`planVerdict`, `rankLevers` and `proposePlanPolicy` into `reviewPlan`, adds
+the data-freshness checks, the owner's decisions, the human checks and the
+next review date. All are pure functions on one seed; the MCP tools
+`earliest_retirement`, `rank_levers` and `review_plan` stamp them. One review
+runs about 100 projections (about 15 seconds at 0.15 s each), so the hosted
+route allows 60 seconds. The loop: the monthly runway check calls
+`review_plan` and reports; in a chat the owner decides; the skill saves the
+decisions to the notes and the approved changes to the profile; the next
+review starts from them. See ADR-010.
+
 ## 3. The planner pipeline (FR-01..FR-12)
 
 1. **Intake** (`intake.ts`) validates form values and builds an immutable

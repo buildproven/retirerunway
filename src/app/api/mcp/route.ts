@@ -9,6 +9,9 @@ import type {
 import { authorizeMcpRequest } from '@/mcp/http-auth'
 import { createPlanServer } from '@/mcp/server'
 
+// review_plan and rank_levers run many projections (REQ-MCP-69).
+export const maxDuration = 60
+
 /**
  * The capability bits that turn off every change notification (BUI-1944).
  * On serverless functions each request runs in its own instance, so the

@@ -150,6 +150,42 @@ last, the can-spend figure and the plan check. Lead with `verdict` and
 `headline`, then `reasons` and `actions` as written. The thresholds are in the
 result; say which one failed.
 
+## The plan: review it, refine it, keep it current (review_plan)
+
+The goal is to retire as early as is safe. The plan of record is the saved
+profile (facts, goals, rules), the plan notes (decisions, scenarios, open
+items) and the latest `review_plan`. Keep it current with the owner:
+
+1. For "where do I stand", "when can I retire", "what should I change", a new
+   snapshot, or the monthly check, call `review_plan` with today's date. Lead
+   with its `headline`, then: when the owner can retire against the target
+   (`timing`; for the full table and a chart, `earliest_retirement`), the top
+   levers as a table (lever, earliest age, years earlier, success at the
+   target age), the best levers together, then `actions`, `dataToRefresh`,
+   `ownerDecisions`, `humanChecks` and `nextReviewDate`.
+2. Take the `ownerDecisions` one at a time. For a lever the owner adopts,
+   change the profile to match (a spending cut in `spendingPhases`, part-time
+   income in `otherIncomeMonthly` with start and end ages, a home sale in
+   `homeSale`, a new target in `targetRetirementAge`) and save it with
+   `save_profile` once the owner says yes. For rule changes, follow
+   propose_plan_rules below. For goals ("I want 80% to be safe enough", "review
+   every two weeks"), save `goals`.
+3. Record each decision, with its date and reason, in the `decisions` notes
+   section, and open questions in `openItems`, with `save_plan_notes`.
+4. For the owner's real options (a move to a named town, a part-time role at a
+   known pay, a different home price), call `rank_levers` with `custom`
+   levers: a name and the profile changes. For a move, take the home price and
+   property tax from Lifescape when it is connected and set `homeSale` with
+   `replacementHomeCost` and `annualHousingCostChange`.
+5. Give the `humanChecks` as written: they are what a fee-only planner, a CPA,
+   an estate attorney or the agencies should confirm before the plan is
+   final. Offer to write the questions for that meeting.
+6. When the owner wants the plan as a document, write it from the latest
+   `review_plan`, the profile and the notes: goals, where it stands, when they
+   can retire, the levers chosen, the rules, the actions with dates, the
+   checks for professionals and the next review date. Every figure from a
+   tool result.
+
 ## Build the plan rules with the owner: propose_plan_rules
 
 The owner should not have to invent the rules plan_check follows. Call
@@ -244,8 +280,12 @@ nothing. Never trade, never change the saved profile, and write only the
 4. If the owner is within 12 months of `targetRetirementAge` or past it,
    call `explore_roth_conversions` and report `best` and the conversion for
    the current year from its `conversionsByAge`.
-5. Call `plan_verdict` with `asOfDate` set to today; the brief opens with its
-   verdict and headline. Then call `plan_check` with `asOfDate` set to today.
+5. Call `review_plan` with `asOfDate` set to today; the brief opens with its
+   `headline` (verdict, when the owner can retire, the best levers). Add one
+   line per item of `dataToRefresh`, the count of `ownerDecisions` ("<n>
+   decisions waiting: review in a chat"), and the `nextReviewDate`. Never act
+   on a lever or rule change: the owner decides in a chat.
+6. Call `plan_check` with `asOfDate` set to today.
    When `planRules.cdLadder` is saved, first read current yields from a page
    that shows its own as-of date (the broker's new-issue CD and Treasury
    table, or the US Treasury daily par yield curve) and pass them as
@@ -253,20 +293,16 @@ nothing. Never trade, never change the saved profile, and write only the
    today's date by default: a cached page can be weeks old, and the engine
    flags quotes more than 7 days old. Use call-protected CD yields only. With
    no dated page, call it without `rateQuotes` and add the action "Check
-   today's CD and Treasury yields before buying the ladder rungs". Its `headline` and each
-   recommendation's `action` line (overdue or due sales, rebalancing, cash
-   buffer) go first in the brief, as written. With no `planRules` saved, add
-   the action "Save plan rules (target stock share, sell schedule)".
-6. Call `propose_plan_rules` with `asOfDate` set to today. If `changes` is
-   above 0, add one line to the brief: "Rules: <changes> changes proposed
-   (<the rules>), review them in a chat". Never save them.
+   today's CD and Treasury yields before buying the ladder rungs". Its
+   `headline` and each recommendation's `action` line (overdue or due sales,
+   rebalancing, cash buffer) go first in the actions, as written.
 7. Call `explain_change` with `previousSuccessRate` from the last runway line
    in `agentLog`; add its headline to the brief. Then compare with the previous runway line in `agentLog`: the success rate and
-   `canSpend.monthlySpending`. Name any change of more than 5% and the likely
+   `canSpend.monthlySpending`, and the earliest retirement age. Name any change of more than 5% and the likely
    cause from the briefing (new snapshot, profile change).
 8. Save one line to `agentLog` with `save_plan_notes`, newest first, keeping
-   the last 12 runway lines: `YYYY-MM-DD runway: <plan_check status>, success
-X%, can spend $Y/mo, cut at $A, raise at $B, snapshot <date>`.
+   the last 12 runway lines: `YYYY-MM-DD runway: <verdict>, earliest age <A>,
+success X%, can spend $Y/mo, cut at $A, raise at $B, snapshot <date>`.
 9. The final message is the brief the owner reads on a phone. Start with
    "Runway:", then at most five actions, most important first, then one line
    of figures (success rate, can spend per month, cut and raise points). Plain
@@ -403,6 +439,13 @@ Portfolio tools (holdings and tax strategy):
   with an optional survivor scenario.
 - `historical_backtest`: the plan through 1928–2025 market history.
 - `plan_verdict`: one GO / CAUTION / DELAY verdict for the month.
+- `review_plan`: the plan review: verdict, earliest retirement age, top
+  levers, rule changes, actions, stale data, the owner's decisions, checks for
+  professionals and the next review date.
+- `earliest_retirement`: the earliest age that reaches the owner's goals, and
+  every age's success rates.
+- `rank_levers`: the levers that bring retirement forward, ranked, plus
+  custom levers.
 - `propose_plan_rules`: the engine's proposed plan rules with a reason for each,
   and findings against the current rules; nothing is saved.
 - `explain_change`: what moved the success rate between two snapshots.

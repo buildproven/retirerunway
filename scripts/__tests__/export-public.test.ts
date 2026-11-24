@@ -44,6 +44,7 @@ describe('NFR-07 public export', () => {
     expect(isExcluded('.claude/session-learnings.md')).toBe(true)
     expect(isExcluded('.public-export/denylist.txt')).toBe(true)
     expect(isExcluded('.github/workflows/deploy.yml')).toBe(true)
+    expect(isExcluded('.github/workflows/publish-public.yml')).toBe(true)
     expect(isExcluded('.github/workflows/quality.yml')).toBe(false)
     expect(isExcluded('src/engine/plan-check.ts')).toBe(false)
   })

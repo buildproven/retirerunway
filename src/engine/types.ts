@@ -208,6 +208,18 @@ export interface CashLadder {
 
 // --- User Input / Config ---
 
+/** The owner's goals for the plan (REQ-MCP-68). */
+export interface PlanGoals {
+  /** Chance the money lasts at long-run returns. Default 0.85. */
+  successRate?: number
+  /** Chance at the 10-year forecast returns. Default 0.75. */
+  forecastSuccessRate?: number
+  /** The latest retirement age to consider. Default 70. */
+  latestAge?: number
+  /** Days between plan reviews. Default 30. */
+  reviewEveryDays?: number
+}
+
 export interface UserProfile {
   currentAge: number
   targetRetirementAge: number
@@ -294,6 +306,12 @@ export interface UserProfile {
    * stock share, drift band, cash buffer, sell schedule and accounts never to
    * sell from. The projections ignore it.
    */
+  /**
+   * What the owner is aiming for (REQ-MCP-68): the success rates a retirement
+   * age must reach (default the GO thresholds), the latest age worth
+   * considering, and how often the plan is reviewed.
+   */
+  goals?: PlanGoals
   planRules?: PlanRules
   /**
    * A survivor scenario (REQ-MCP-48): one spouse dies at deathAge (the

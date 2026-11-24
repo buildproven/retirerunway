@@ -28,6 +28,7 @@ const EXCLUDE = [
   '.buildproven/',
   'docs/archive/',
   '.github/workflows/deploy.yml',
+  '.github/workflows/publish-public.yml',
   'tsconfig.tsbuildinfo',
 ]
 

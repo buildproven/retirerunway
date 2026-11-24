@@ -9,14 +9,27 @@ analysis (`docs/archive/PRD_V4_GAP_ANALYSIS-2026-07-26.md`), both kept for histo
 
 ## 1. Product
 
-RetireRunway is a free, open-source (MIT), educational retirement planner for
-people about to leave full-time work. Its main surface is Claude: a plugin and
-MCP server (FR-23) whose tools run the deterministic engine and return every
-figure with a provenance stamp, while Claude only explains them. It answers:
-_can I leave, and does the bridge to Social Security and Medicare survive
-stress?_ with a GO / CAUTION / DELAY verdict, the chance the money lasts, what
-to spend, and what to do next from the owner's own rules (sales, a CD ladder,
-tasks). The original browser app (plan wizard, results, portfolio tools) is
+RetireRunway is a free, open-source (MIT), educational retirement planning
+agent for people about to leave full-time work. **Its purpose is to get the
+owner to retirement as early as is safe:** say when they can retire, which
+levers bring that date forward and by how much, what rules to run the money
+by, and what to do next; then keep that plan current, reviewing it with the
+owner every month and after every change.
+
+It aims to do most of what a paid planner does for the plan itself (the
+analysis, the recommendations and the monitoring) and to hand the judgement
+calls to people: the owner decides every change, and the plan review names
+what a fee-only planner, a CPA, an estate attorney or the agencies should
+check before the plan is final (REQ-MCP-69). The benchmark against paid tools,
+advisers and the research is in `docs/RESEARCH.md`.
+
+Its main surface is Claude: a plugin and MCP server (FR-23) whose tools run
+the deterministic engine and return every figure with a provenance stamp,
+while Claude only explains them. The planning loop follows the planner's
+sequence: understand (profile, snapshots, briefing), goals (profile `goals`),
+analyse (projections, verdict, earliest retirement age), recommend (levers,
+proposed rules), present (the plan review), implement (plan_check trades and
+tasks) and monitor (the monthly runway check). The original browser app is
 frozen: it still builds and its tests still run, and it computes in the
 browser.
 
@@ -612,6 +625,49 @@ A scheduled run reports the count of changes and never saves (REQ-MCP-64).
 buffer always but recommends building it only once the owner's age reaches
 it (REQ-MCP-65).
 
+**Goals (REQ-MCP-68).** `goals` in the profile holds what the owner is aiming
+for: the chance the money lasts at long-run returns (`successRate`, default
+0.85) and at the 10-year forecast returns (`forecastSuccessRate`, default
+0.75), the latest retirement age worth considering (`latestAge`, default 70)
+and the days between plan reviews (`reviewEveryDays`, default 30).
+
+**When can I retire (REQ-MCP-66).** `earliest_retirement` runs the plan
+retiring at every age from next year to `latestAge`, at both return
+assumptions on one seed, and returns the earliest age where both success rates
+reach the goals, the gap to the target age and the table. Moving the
+retirement age moves the separation age, the deferred-compensation payout
+start, the first retirement spending phase and a home sale when they were tied
+to it; ages fixed by law or contract (a lump sum's age) stay.
+
+**Levers (REQ-MCP-67).** `rank_levers` pulls each lever that fits the plan on
+its own: spend 5% and 10% less in retirement, save $10,000 more a year until
+retirement, earn $2,000 a month part-time for 5 years after retiring, and
+downsize the home at retirement to one at half the price (6% selling costs),
+plus up to 4 custom levers (a name and profile changes, such as a move found
+with Lifescape). For each it returns the earliest age that reaches the goals,
+the years gained against the plan as it is, and both success rates at the
+target age, ranked by years gained and then by the worse of the two rates;
+then the best helping lever of each group pulled together. The earliest age is
+found by bisection, which assumes a later retirement never lowers success;
+`earliest_retirement` scans every age and is the reference.
+
+**The plan review (REQ-MCP-69).** `review_plan` is the living plan in one
+result, for the monthly check and whenever the owner asks where things stand:
+the verdict and its measures, the earliest age against the target, the top 5
+levers and the best together, the count and names of the rule changes
+propose_plan_rules suggests, the actions due from the owner's rules, the data
+to refresh (positions over 35 days old, sales marked done after the snapshot,
+a mortgage balance over a year old), the decisions only the owner can make,
+the checks for human professionals (always a fee-only planner review, Social
+Security records and an estate attorney; a Marketplace quote when healthcare
+before 65 is in the plan; the deferred-compensation election; the US tax on
+each lump sum; Roth conversion amounts when over 70% of the money is pre-tax;
+life cover when there is a spouse), and the next review date: the review
+cadence, or sooner when a sale or task falls due. It changes nothing. The
+skill records what the owner decides in the plan notes and applies approved
+changes with save_profile, so the plan is reviewed and refined with the owner
+over time.
+
 `spending_guardrails` answers "how much can I spend" in dollars with
 risk-based guardrails on the same model and seed: `canSpend` is the first
 retirement year's spending without the mortgage payment (all spending phases
@@ -714,7 +770,10 @@ dropped, the public README in place and the plugin links pointed at the
 public repo. It exits 1, listing each hit, when any copied text file matches
 the private denylist (`.public-export/denylist.txt`, never exported). Each
 release is one commit in the public repo made from a fresh export, so its
-history holds only exported copies, never the private history.
+history holds only exported copies, never the private history. The release is automatic: when a merge to main changes the version, the
+`Publish public copy` workflow runs the export (which fails on any denylist
+hit) and commits it with a deploy key held as the `PUBLIC_REPO_DEPLOY_KEY`
+secret; without the key it warns and skips.
 
 ### NFR-08 Deployment readiness
 

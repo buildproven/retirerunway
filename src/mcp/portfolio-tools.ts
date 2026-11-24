@@ -26,6 +26,12 @@ import { backtestHistory } from '../engine/historical-backtest'
 import { explainChange } from '../engine/change-explainer'
 import { VERDICT_THRESHOLDS, planVerdict } from '../engine/plan-verdict'
 import { POLICY_DEFAULTS, proposePlanPolicy } from '../engine/plan-policy'
+import { REVIEW_DEFAULTS, reviewPlan } from '../engine/plan-review'
+import {
+  TIMING_DEFAULTS,
+  earliestRetirement,
+  rankLevers,
+} from '../engine/retirement-timing'
 import {
   PLAN_CHECK_DEFAULTS,
   PlanCheckError,
@@ -83,6 +89,9 @@ import {
   historicalBacktestInput,
   planVerdictInput,
   proposePlanRulesInput,
+  earliestRetirementInput,
+  rankLeversInput,
+  reviewPlanInput,
   explainChangeInput,
   portfolioAnalysisInput,
   projectRetirementInput,
@@ -1250,6 +1259,125 @@ export function registerPortfolioTools(server: McpServer): void {
               thresholds: VERDICT_THRESHOLDS,
               dollars: "today's dollars",
               nothingTraded: true,
+              ...savedAssumption(savedData),
+            },
+          }
+        ),
+      })
+    }
+  )
+
+  // REQ-MCP-66: when can I retire?
+  server.registerTool(
+    'earliest_retirement',
+    {
+      title: 'Earliest retirement age',
+      description:
+        "When can I retire? Runs the saved plan (or profile/portfolio) retiring at every age from next year to goals.latestAge (default 70), at long-run and 10-year forecast returns on one seed, and returns the earliest age where both success rates reach the owner's goals (profile goals; default 85% and 75%, the GO thresholds), the gap to the target age, and the table of ages. Moving the retirement age also moves the separation age, the deferred-compensation payout start, the first retirement spending phase and a home sale when they were tied to the old age. Takes several seconds.",
+      inputSchema: earliestRetirementInput,
+    },
+    async args => {
+      const inputs = await resolveInputs('earliest_retirement', args)
+      if (!inputs.ok) return errorResult(inputs.errors)
+      const { portfolio, profile, savedData } = inputs
+      const seed = args.seed ?? MONTE_CARLO_DEFAULTS.DEFAULT_SEED
+      const result = earliestRetirement(portfolio, profile, { seed })
+      return jsonResult({
+        ...result,
+        provenance: stamp(
+          'earliest_retirement',
+          { ...args, portfolio, profile },
+          result,
+          {
+            seed,
+            assumptions: {
+              snapshotDate: portfolio.asOfDate,
+              model: 'project_retirement, long-run and forecast presets',
+              dollars: "today's dollars",
+              ...savedAssumption(savedData),
+            },
+          }
+        ),
+      })
+    }
+  )
+
+  // REQ-MCP-67: which levers bring retirement forward.
+  server.registerTool(
+    'rank_levers',
+    {
+      title: 'Rank the levers',
+      description:
+        "What gets me to retirement sooner? Pulls each lever that fits the plan one at a time (spend 5% or 10% less, save $10,000 more a year, $2,000/mo part-time for 5 years, downsize the home at retirement) plus up to 4 custom levers (name and profile changes, such as a move to a cheaper town with homeSale), and returns for each the earliest age that reaches the owner's goals, years earlier than today, and the success rates at the target age, ranked best first; then the best lever of each group pulled together. Same seed and goals as earliest_retirement. Takes several seconds.",
+      inputSchema: rankLeversInput,
+    },
+    async args => {
+      const inputs = await resolveInputs('rank_levers', args)
+      if (!inputs.ok) return errorResult(inputs.errors)
+      const { portfolio, profile, savedData } = inputs
+      const seed = args.seed ?? MONTE_CARLO_DEFAULTS.DEFAULT_SEED
+      const result = rankLevers(portfolio, profile, {
+        seed,
+        ...(args.custom === undefined ? {} : { custom: args.custom }),
+      })
+      return jsonResult({
+        ...result,
+        provenance: stamp(
+          'rank_levers',
+          { ...args, portfolio, profile },
+          result,
+          {
+            seed,
+            assumptions: {
+              snapshotDate: portfolio.asOfDate,
+              levers: TIMING_DEFAULTS,
+              earliestAgeSearch:
+                'bisection between next year and goals.latestAge',
+              dollars: "today's dollars",
+              ...savedAssumption(savedData),
+            },
+          }
+        ),
+      })
+    }
+  )
+
+  // REQ-MCP-69: the living plan, reviewed.
+  server.registerTool(
+    'review_plan',
+    {
+      title: 'Review the plan',
+      description:
+        "The plan review, for every monthly check and whenever the owner asks where the plan stands. On asOfDate (pass today's date) it returns: the verdict and its measures (plan_verdict), when the owner can retire against the target (earliest age that reaches the goals), the top levers and the best of them together (rank_levers), how many rule changes propose_plan_rules suggests, the actions due from the owner's rules, data to refresh, the decisions only the owner can make, what a human professional should check (fee-only planner, CPA, healthcare quote, Social Security records, estate attorney), and the next review date. Changes nothing. Takes up to half a minute.",
+      inputSchema: reviewPlanInput,
+    },
+    async args => {
+      const inputs = await resolveInputs('review_plan', args)
+      if (!inputs.ok) return errorResult(inputs.errors)
+      const { portfolio, profile, savedData } = inputs
+      const seed = args.seed ?? MONTE_CARLO_DEFAULTS.DEFAULT_SEED
+      const asOfDate = args.asOfDate ?? portfolio.asOfDate
+      let result: ReturnType<typeof reviewPlan>
+      try {
+        result = reviewPlan(portfolio, profile, asOfDate, { seed })
+      } catch (error) {
+        if (!(error instanceof PlanCheckError)) throw error
+        return errorResult([{ field: error.field, message: error.message }])
+      }
+      return jsonResult({
+        ...result,
+        provenance: stamp(
+          'review_plan',
+          { ...args, portfolio, profile, asOfDate },
+          result,
+          {
+            seed,
+            assumptions: {
+              asOfDate,
+              snapshotDate: portfolio.asOfDate,
+              tools: ['plan_verdict', 'rank_levers', 'propose_plan_rules'],
+              review: REVIEW_DEFAULTS,
+              nothingSaved: true,
               ...savedAssumption(savedData),
             },
           }

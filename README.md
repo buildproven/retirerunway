@@ -69,6 +69,14 @@ the skill.
 
 ## What it does
 
+- **When can you retire, and what gets you there sooner.** `earliest_retirement`
+  tests every retirement age against your own goals; `rank_levers` shows how
+  many years each lever buys (spend less, save more, part-time work,
+  downsizing, or your own options such as a move).
+- **A plan that stays current.** `review_plan` puts it together each month:
+  the verdict, the earliest age, the best levers, rule changes, what is due,
+  what data is stale, the decisions that are yours, and what a planner, CPA or
+  attorney should check before you act.
 - **A monthly verdict.** `plan_verdict` gives one GO, CAUTION or DELAY call
   from the success rate at long-run returns, the success rate at 10-year
   forecast returns, a replay through market history from every start year

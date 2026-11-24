@@ -383,7 +383,9 @@
         "src/engine/roth-conversion-explorer.ts",
         "src/engine/cd-ladder.ts",
         "src/lib/ssrf-protection.ts",
-        "src/engine/plan-policy.ts"
+        "src/engine/plan-policy.ts",
+        "src/engine/retirement-timing.ts",
+        "src/engine/plan-review.ts"
       ],
       "tests": [
         "src/mcp/__tests__/server.test.ts",
@@ -429,7 +431,8 @@
         "src/mcp/__tests__/roth-explorer-tool.test.ts",
         "src/engine/__tests__/cd-ladder.test.ts",
         "src/lib/__tests__/ssrf-protection.test.ts",
-        "src/engine/__tests__/plan-policy.test.ts"
+        "src/engine/__tests__/plan-policy.test.ts",
+        "src/engine/__tests__/retirement-timing.test.ts"
       ]
     },
     {
