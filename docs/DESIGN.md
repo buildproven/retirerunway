@@ -256,6 +256,21 @@ route allows 60 seconds. The loop: the monthly runway check calls
 decisions to the notes and the approved changes to the profile; the next
 review starts from them. See ADR-010.
 
+### 2.w Stable tool surface (REQ-MCP-73, REQ-MCP-74)
+
+`createPlanServer` calls `recordTools(server)` before any tool is
+registered: it wraps `registerTool` so each tool's name, description, zod
+schema and handler go into a registry. `registerToolDoor` adds `run_tool`,
+which validates `arguments` against the registered schema and calls the
+registered handler, so the call path, provenance and errors are the tool's
+own. `toolCatalog` turns the registry into the `tools` list in
+`get_briefing`. `update_profile` applies `patchProfile`
+(`src/mcp/profile-patch.ts`) to the saved profile and validates the result
+with `userProfileSchema` and `UserProfileSchema` before saving. Rule for
+releases: new features are added as tools as before; old chats reach them
+through `run_tool`, new chats see them directly. Tool names and argument
+meanings are never removed or changed within a major version. See ADR-012.
+
 ### 2.z Withdrawal order, glide path and balances (REQ-MCP-70..72)
 
 `drawDown` in `src/engine/retirement-projection.ts` takes the order from the

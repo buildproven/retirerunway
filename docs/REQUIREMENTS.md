@@ -668,6 +668,26 @@ skill records what the owner decides in the plan notes and applies approved
 changes with save_profile, so the plan is reviewed and refined with the owner
 over time.
 
+**A stable tool surface (REQ-MCP-73).** Claude loads a connector's tools and
+their input schemas when a chat starts (the phone and desktop apps can keep
+them longer), and no client re-reads them mid-chat, so a tool or field added
+in a release is out of reach of an open chat. The server therefore keeps a
+registry of every tool it registers; `run_tool` (`tool`, `arguments` as an
+open object) calls any of them by name, checks the arguments against that
+tool's current schema with field-level errors, and returns the tool's own
+result; it will not run itself or `delete_user_data`. `get_briefing`
+returns `tools`, every tool with a one-line summary and its arguments
+(required ones marked `*`), so a chat learns of new tools from a result. The
+instructions and skill tell the agent to use `run_tool` for a listed tool
+missing from its list and never to ask the owner to start a new chat for it.
+
+**Patch saves (REQ-MCP-74).** `update_profile` changes saved profile fields
+by dotted path (`set`, arrays replaced whole) and drops fields (`remove`),
+then checks the merged profile with the same strict schema and value rules as
+`save_profile`, saving nothing when any check fails. Its `set` is an open
+object, so its schema never changes as fields are added. The agent never
+asks the owner for a figure the saved profile or notes already hold.
+
 **Withdrawal order (REQ-MCP-70).** The projection takes spending, after RMDs
 and the deferred-compensation payout and before any penalised early
 withdrawal, in the profile's `withdrawalOrder`: `taxableFirst` (the default:

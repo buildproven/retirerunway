@@ -387,7 +387,9 @@
         "src/engine/retirement-timing.ts",
         "src/engine/plan-review.ts",
         "src/engine/withdrawal-order.ts",
-        "src/engine/balance-sheet.ts"
+        "src/engine/balance-sheet.ts",
+        "src/mcp/tool-door.ts",
+        "src/mcp/profile-patch.ts"
       ],
       "tests": [
         "src/mcp/__tests__/server.test.ts",
@@ -437,7 +439,8 @@
         "src/engine/__tests__/retirement-timing.test.ts",
         "src/engine/__tests__/balance-sheet.test.ts",
         "src/engine/__tests__/withdrawal-glide.test.ts",
-        "src/mcp/__tests__/balances-orders-tool.test.ts"
+        "src/mcp/__tests__/balances-orders-tool.test.ts",
+        "src/mcp/__tests__/tool-door.test.ts"
       ]
     },
     {

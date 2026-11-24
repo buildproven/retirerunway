@@ -128,6 +128,12 @@ describe('REQ-MCP-34: the server sends its own agent instructions', () => {
     expect(SERVER_INSTRUCTIONS).toMatch(/Never compute or estimate a figure/)
   })
 
+  it('REQ-MCP-34 tells the agent to have the owner reconnect when a new tool is missing', () => {
+    expect(SERVER_INSTRUCTIONS).toMatch(
+      /names a tool this chat cannot call, tell the owner to reconnect/
+    )
+  })
+
   it('REQ-MCP-34 names only tools the server registers', async () => {
     const registered = new Set(
       (await client.listTools()).tools.map(tool => tool.name)

@@ -18,7 +18,12 @@ import {
   noInput,
   savePlanNotesInput,
   saveProfileInput,
+  updateProfileInput,
+  userProfileSchema,
 } from './schemas'
+import { ProfilePatchError, patchProfile } from './profile-patch'
+import { toolCatalog } from './tool-door'
+import type { ToolRegistry } from './tool-door'
 import { openDataStore } from './git-store'
 import { WHATS_NEW } from './instructions'
 import {
@@ -194,13 +199,16 @@ export function nextActions(
   return actions.slice(0, MAX_NEXT_ACTIONS)
 }
 
-export function registerUserDataTools(server: McpServer): void {
+export function registerUserDataTools(
+  server: McpServer,
+  registry?: ToolRegistry
+): void {
   server.registerTool(
     'get_briefing',
     {
       title: 'Get briefing',
       description:
-        "Call this first in every conversation. Returns, in order: warnings (such as a mortgage payoff date that does not match the loan, or saved notes that break a rule) and missing inputs that move the result most, each naming the tool that fixes it; the saved profile with when it was saved and the newest snapshot dates with their totals; the plan notes by section (decisions, scenarios, confirmedFigures, openItems, agentLog), each with its text and revision; at most five next actions; and the server version with what's new. Reads only; changes nothing.",
+        "Call this first in every conversation. Returns, in order: warnings (such as a mortgage payoff date that does not match the loan, or saved notes that break a rule) and missing inputs that move the result most, each naming the tool that fixes it; the saved profile with when it was saved and the newest snapshot dates with their totals; the plan notes by section (decisions, scenarios, confirmedFigures, openItems, agentLog), each with its text and revision; at most five next actions; the server version with what's new; and tools: every tool the server has now with its arguments (required ones end in *). A tool in that list but not in your tool list was added after this chat started: call it with run_tool. Reads only; changes nothing.",
       inputSchema: noInput,
     },
     async () => {
@@ -254,6 +262,8 @@ export function registerUserDataTools(server: McpServer): void {
           profile?.profile.planRules !== undefined
         ),
         server: { version: packageJson.version, whatsNew: WHATS_NEW },
+        // REQ-MCP-73: the live tool list, read fresh by every chat.
+        ...(registry === undefined ? {} : { tools: toolCatalog(registry) }),
       })
     }
   )
@@ -337,6 +347,74 @@ export function registerUserDataTools(server: McpServer): void {
       )
       if (!saved.ok) return errorResult([saved.error])
       return jsonResult({ ok: true, ...saved.value })
+    }
+  )
+
+  // REQ-MCP-74: change only the fields that change.
+  server.registerTool(
+    'update_profile',
+    {
+      title: 'Update profile fields',
+      description:
+        'Change saved profile fields without resending the whole profile. Pass set (dotted field paths to new values, such as {"planRules.outsideCash": 15135, "consumerDebt": 20036}; arrays such as planRules.tasks are replaced whole) and remove (paths to drop, such as homeSale). The merged profile is checked by the same rules as save_profile, and nothing is saved when any value is invalid. Returns the paths that changed and the saved profile. Needs a saved profile (save_profile first). Save only what the owner confirmed.',
+      inputSchema: updateProfileInput,
+    },
+    async ({ set, remove }) => {
+      const read = await fromStore(async () =>
+        openDataStore('update_profile').readProfile()
+      )
+      if (!read.ok) return errorResult([read.error])
+      if (read.value === undefined)
+        return errorResult([
+          {
+            field: 'profile',
+            message:
+              'no profile saved yet: call save_profile with the whole profile first',
+          },
+        ])
+      let patched: ReturnType<typeof patchProfile>
+      try {
+        patched = patchProfile(
+          read.value.profile as unknown as Record<string, unknown>,
+          set ?? {},
+          remove ?? []
+        )
+      } catch (error) {
+        if (!(error instanceof ProfilePatchError)) throw error
+        return errorResult([{ field: error.field, message: error.message }])
+      }
+      if (patched.changed.length === 0)
+        return jsonResult({
+          ok: true,
+          changed: [],
+          message: 'nothing changed: every value already matched',
+          updatedAt: read.value.updatedAt,
+        })
+      const shape = userProfileSchema.safeParse(patched.profile)
+      const issues = shape.success
+        ? (() => {
+            const values = UserProfileSchema.safeParse(shape.data)
+            return values.success ? [] : values.error.issues
+          })()
+        : shape.error.issues
+      if (issues.length > 0)
+        return errorResult(
+          issues.map(issue => ({
+            field: ['profile', ...issue.path.map(String)].join('.'),
+            message: issue.message,
+          }))
+        )
+      const profile = (
+        shape.success ? shape.data : patched.profile
+      ) as UserProfile
+      const saved = await fromStore(async () =>
+        openDataStore('update_profile').saveProfile(
+          profile,
+          new Date().toISOString()
+        )
+      )
+      if (!saved.ok) return errorResult([saved.error])
+      return jsonResult({ ok: true, changed: patched.changed, ...saved.value })
     }
   )
 

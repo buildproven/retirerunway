@@ -322,6 +322,7 @@ describe('REQ-MCP-37: get_briefing order, fixes, next actions and version', () =
       'notes',
       'nextActions',
       'server',
+      'tools',
     ])
     expect(
       Object.keys((content(result) as unknown as Briefing).checks)

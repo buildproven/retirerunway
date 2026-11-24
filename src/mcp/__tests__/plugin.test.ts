@@ -42,11 +42,13 @@ const SKILL_TOOLS = [
   'propose_plan_rules',
   'rank_levers',
   'review_plan',
+  'run_tool',
   'save_plan_notes',
   'save_profile',
   'spending_guardrails',
   'tax_strategy',
   'trade_plan',
+  'update_profile',
 ]
 
 function read(path: string): string {

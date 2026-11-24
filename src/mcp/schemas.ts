@@ -781,6 +781,14 @@ export const explainChangeInput = z.strictObject({
 // User data tool schemas (REQ-MCP-11..15).
 export const saveProfileInput = z.strictObject({ profile: userProfileSchema })
 
+// REQ-MCP-74: change saved profile fields by path. `set` is an open object so
+// the published schema never changes as fields are added; the merged profile
+// is checked against userProfileSchema.
+export const updateProfileInput = z.strictObject({
+  set: z.record(z.string().min(1).max(80), z.unknown()).optional(),
+  remove: z.array(z.string().min(1).max(80)).max(20).optional(),
+})
+
 export const noInput = z.strictObject({})
 
 /** The longest notes text a store reads in one section (version 1 notes held up to this), in characters. */

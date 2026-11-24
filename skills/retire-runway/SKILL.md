@@ -248,6 +248,22 @@ one (where it is raised 10%), each with its chance of success before and
 after. The levels are for today: run it again monthly or after a big market
 move.
 
+## Tools added after the chat started: run_tool
+
+Claude keeps the tool list from the start of a chat, so a tool the server
+added later is missing from it. `get_briefing` returns `tools`, every tool
+the server has now with its arguments. When a tool there is not in your list,
+call `run_tool` with its name and arguments; never tell the owner to start a
+new chat for it.
+
+## Change saved figures: update_profile
+
+To change saved profile fields, call `update_profile` with only what changed
+(`set` with dotted paths such as planRules.outsideCash, `remove` for fields
+to drop). Use `save_profile` only for a first profile. Before asking the
+owner for a figure, check the saved profile and plan notes: a figure the
+owner gave before is used, not asked for again.
+
 ## Balances from Empower: import_balances
 
 When the owner pastes balances (Empower's net-worth page or any list of

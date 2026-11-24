@@ -30,6 +30,7 @@ import {
 import { registerPortfolioTools } from './portfolio-tools'
 import { SERVER_INSTRUCTIONS } from './instructions'
 import { registerUserDataTools } from './user-data-tools'
+import { recordTools, registerToolDoor } from './tool-door'
 import { jsonResult } from './result'
 
 interface IntakeFieldError {
@@ -80,6 +81,8 @@ export function createPlanServer(): McpServer {
     },
     { instructions: SERVER_INSTRUCTIONS }
   )
+  // REQ-MCP-73: record every tool so run_tool and the briefing can reach it.
+  const registry = recordTools(server)
 
   server.registerTool(
     'build_plan',
@@ -197,7 +200,8 @@ export function createPlanServer(): McpServer {
   )
 
   registerPortfolioTools(server)
-  registerUserDataTools(server)
+  registerUserDataTools(server, registry)
+  registerToolDoor(server, registry)
 
   return server
 }
