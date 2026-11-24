@@ -94,6 +94,33 @@ describe('REQ-MCP-60 lump sums', () => {
     )
   })
 
+  it('warns only about the sums the projection adds, at a fractional age too', () => {
+    const lumpAt = (age: number): UserProfile => ({
+      ...base,
+      lumpSums: [{ name: 'Inheritance', age, amount: 50_000 }],
+    })
+    const totals = (profile: UserProfile) =>
+      projectRetirement(portfolio, profile, {
+        paths: 10,
+      }).expectedPath.years.map(y => y.endBalances.total)
+    // 53.5 counts as 53, the current age, so no projection year adds it.
+    expect(totals(lumpAt(53.5))).toEqual(totals(base))
+    expect(projectionWarnings(portfolio, lumpAt(53.5))).toContain(
+      'lump sum "Inheritance" is ignored: age 53.5 (counted as 53) is outside the projection (54 to 95)'
+    )
+    // 60.5 counts as 60 and is added there.
+    expect(yearAt(lumpAt(60.5), 60).endBalances).toEqual(
+      yearAt(lumpAt(60), 60).endBalances
+    )
+    expect(projectionWarnings(portfolio, lumpAt(60.5))).toContain(
+      'lump sum "Inheritance": $50,000 after tax in today\'s dollars arrives at 60 into taxable savings'
+    )
+    // 95.5 counts as 95, the last projection year, so it is not ignored.
+    expect(projectionWarnings(portfolio, lumpAt(95.5))).toContain(
+      'lump sum "Inheritance": $50,000 after tax in today\'s dollars arrives at 95 into taxable savings'
+    )
+  })
+
   it('validates the profile field', () => {
     expect(userProfileSchema.safeParse(withSuper).success).toBe(true)
     expect(

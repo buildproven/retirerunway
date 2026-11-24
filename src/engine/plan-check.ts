@@ -205,6 +205,15 @@ function validateRules(rules: PlanRules): void {
       'planRules.minCashBufferYears',
       'must be from 0 to 10'
     )
+  const startAge = rules.bufferStartAge
+  if (
+    startAge !== undefined &&
+    (!Number.isFinite(startAge) || startAge < 18 || startAge > 100)
+  )
+    throw new PlanCheckError(
+      'planRules.bufferStartAge',
+      'must be from 18 to 100'
+    )
   const ids = new Set<string>()
   for (const [index, sale] of (rules.sellSchedule ?? []).entries()) {
     const field = `planRules.sellSchedule.${index}`
@@ -589,7 +598,11 @@ export function checkPlan(
   }
 
   const cashAfter = cashBuffer + soldLiquid
-  if (yearsOf(cashAfter) < minCashBufferYears - 1e-9) {
+  // REQ-MCP-65: before bufferStartAge the buffer is measured, not asked for.
+  const bufferDue =
+    rules.bufferStartAge === undefined ||
+    profile.currentAge >= rules.bufferStartAge
+  if (bufferDue && yearsOf(cashAfter) < minCashBufferYears - 1e-9) {
     const short = minCashBufferYears * annualSpending - cashAfter
     const inRetirement =
       retirementAccountCash > 0.005

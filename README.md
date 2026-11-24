@@ -73,6 +73,11 @@ the skill.
   from the success rate at long-run returns, the success rate at 10-year
   forecast returns, a replay through market history from every start year
   since 1928, the spending the plan supports, and your own rules.
+- **Rules drafted for you.** `propose_plan_rules` runs the plan at 30% to 80%
+  stocks and proposes the share that holds up best at both long-run and
+  forecast returns, a CD or Treasury ladder that funds your first retirement
+  years, a cash buffer that starts a year before you retire and the sales to
+  get there, each with its reason. You approve each one.
 - **Your rules, checked.** `plan_check` measures your newest snapshot against
   the rules you set (target stock share, drift band, cash buffer, a sell
   schedule, accounts never to sell from, one-off tasks) and lists what is due,

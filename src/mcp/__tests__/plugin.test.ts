@@ -36,6 +36,7 @@ const SKILL_TOOLS = [
   'plan_verdict',
   'portfolio_analysis',
   'project_retirement',
+  'propose_plan_rules',
   'save_plan_notes',
   'save_profile',
   'spending_guardrails',

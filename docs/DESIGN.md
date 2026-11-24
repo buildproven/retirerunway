@@ -230,6 +230,17 @@ skill ZIP (`retire-runway/SKILL.md`, fixed timestamp). `@anthropic-ai/mcpb`
 pins zod 3, which has a high advisory below 4.6.6; an npm override gives it
 the project's zod 4, and `mcpb validate` and `mcpb pack` pass with it.
 
+### 2.x Plan rules: proposed by the engine, approved by the owner (REQ-MCP-64)
+
+`src/engine/plan-policy.ts` turns the profile and snapshot into proposed
+`planRules`. It is a pure function over the engine: the stock-share test calls
+`projectRetirement` once per candidate and assumption set on a rebalanced copy
+of the portfolio; the ladder reads the expected path's yearly withdrawals; the
+sell schedule comes from `checkPlan` run with the proposed rules. The MCP tool
+`propose_plan_rules` stamps the result. The flow is propose, present, approve,
+save: the tool never writes, the skill walks the owner through each finding,
+and only save_profile persists a rule. See ADR-009.
+
 ## 3. The planner pipeline (FR-01..FR-12)
 
 1. **Intake** (`intake.ts`) validates form values and builds an immutable

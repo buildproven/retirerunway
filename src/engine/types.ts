@@ -424,6 +424,8 @@ export interface PlanRules {
   bufferSymbols?: string[]
   /** One-off actions that are not stock sales, such as a fund switch (REQ-MCP-61). */
   tasks?: PlanTask[]
+  /** The age the liquid cash buffer is needed from (REQ-MCP-65); before it plan_check only measures it. */
+  bufferStartAge?: number
   /** A CD or Treasury ladder to build in one account type (REQ-MCP-63). */
   cdLadder?: CdLadderRule
 }

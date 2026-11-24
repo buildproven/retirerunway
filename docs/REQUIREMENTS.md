@@ -566,6 +566,52 @@ the stock lots before anything is measured, and its proceeds count as cash
 where they landed, so plan_check never sells or counts those dollars twice
 (REQ-MCP-63).
 
+**The agent proposes the rules (REQ-MCP-64).** RetireRunway follows the
+financial-planning sequence a planner uses: understand the household, set
+goals, analyse, develop recommendations, present them, implement, monitor.
+The engine already analyses (projections, verdict), implements (plan_check
+trades) and monitors (runway check); `propose_plan_rules` develops and
+presents the investment rules themselves, so the owner is not left to invent
+them. From the saved profile and newest snapshot it returns:
+
+- **Stock share, tested.** The plan is run at each candidate stock share (30%
+  to 80% in steps of 10, plus the current target), at the long-run means and
+  at the 10-year forecast means, on one seed, with each account rebalanced to
+  the candidate and its total and taxable basis kept. The proposal is the share
+  with the best worse-of-the-two success rate; within 1 point, the lower share.
+  The table of results comes with it.
+- **A ladder that funds spending.** Rungs mature one a year from the
+  retirement year for the bridge to Social Security (at most 5 rungs), each
+  sized to the expected path's withdrawals that year (not counting deferred
+  compensation, which pays itself), in today's dollars. The ladder is never
+  larger than the bonds and cash the proposed stock share leaves; rungs it
+  cannot fill are named. It sits in the account type holding the most money
+  outside taxable and deferred-compensation accounts, and a rung whose
+  withdrawal would carry the 10% early penalty (before 59½, unless the Rule of
+  55 applies to a 401(k)) is flagged. Rungs more than 10 years out are marked
+  to buy later.
+- **A cash buffer that starts when it is needed:** 1 year of retirement
+  spending in liquid cash from one year before retirement (`bufferStartAge`);
+  plan_check does not ask for it before then (REQ-MCP-65).
+- **A sell schedule** for stocks above the proposed share that the current
+  schedule does not cover: up to 3 equal monthly sales on the 15th, from the
+  account plan_check would sell in, in $1,000 units.
+- **Protected accounts:** taxable accounts with unrealised gains are
+  protected, so sales come from tax-advantaged accounts first.
+- **Findings** for each rule: keep, change, add or needs input, with the
+  current value, the proposed value and the reason, including conflicts in the
+  current rules (a ladder that matures before retirement, a buffer asked for
+  years early, a target the test does not support, bank savings not given).
+
+`proposedRules` is a complete `planRules` that keeps the owner's tasks,
+buffer symbols and done sales. Nothing is saved: the agent presents each
+finding, and the owner approves or declines each change before save_profile.
+A scheduled run reports the count of changes and never saves (REQ-MCP-64).
+
+`planRules.bufferStartAge` (18 to 100): plan_check measures the liquid cash
+buffer always but recommends building it only once the owner's age reaches
+it (REQ-MCP-65).
+
 `spending_guardrails` answers "how much can I spend" in dollars with
 risk-based guardrails on the same model and seed: `canSpend` is the first
 retirement year's spending without the mortgage payment (all spending phases

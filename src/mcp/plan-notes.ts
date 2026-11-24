@@ -200,6 +200,11 @@ const GOVERNMENT_ID_PATTERN =
   /\b(?:passport|driver'?s? licen[cs]e|licen[cs]e (?:number|no\.?|#)|tfn|tax file number|itin|ein|medicare (?:number|card)(?: number)?|national id|id (?:number|no\.?|#))\b[^\n]{0,20}?([A-Z0-9][A-Z0-9 -]{4,}[A-Z0-9])/gi
 const PASSWORD_PATTERN =
   /\b(?:password|passwd|passcode|pwd|pin)\b\s*(?:is|was|=|:)\s*\S{3,}/i
+// A hyphenated date (2026-11-19, 2026-11 or 11-19-2026). Dates are allowed,
+// so they are blanked before the account and ID checks, which would otherwise
+// read one as a number.
+const ISO_DATE =
+  /(?<![\d-])(?:(?:19|20)\d{2}-(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12]\d|3[01]))?|(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])-(?:19|20)\d{2})(?![\d-])/g
 
 /**
  * The kinds of sensitive content in `text`, in a fixed order, without the
@@ -217,10 +222,11 @@ export function findSensitiveContent(text: string): SensitiveKind[] {
   if (SSN_PATTERN.test(text) || SSN_KEYWORD.test(text)) {
     found.add('Social Security number')
   }
-  for (const match of text.matchAll(ACCOUNT_PATTERN)) {
+  const withoutDates = text.replace(ISO_DATE, ' ')
+  for (const match of withoutDates.matchAll(ACCOUNT_PATTERN)) {
     if (digitCount(match[1]) >= 6) found.add('account or routing number')
   }
-  for (const match of text.matchAll(GOVERNMENT_ID_PATTERN)) {
+  for (const match of withoutDates.matchAll(GOVERNMENT_ID_PATTERN)) {
     if (digitCount(match[1]) >= 5) found.add('government ID number')
   }
   if (PASSWORD_PATTERN.test(text)) found.add('password')

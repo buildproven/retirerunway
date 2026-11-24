@@ -172,8 +172,8 @@ export function nextActions(
       : [
           {
             action:
-              'Set planRules (target stock share, drift band, sell schedule) with save_profile so plan_check can recommend trades',
-            tool: 'save_profile',
+              'Draft your plan rules with propose_plan_rules (stock share tested, ladder, cash buffer, sales), then save the ones you approve with save_profile',
+            tool: 'propose_plan_rules',
           },
         ]
   const actions: NextAction[] = [

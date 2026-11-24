@@ -403,6 +403,8 @@ export const planRulesSchema = z.strictObject({
     )
     .max(24)
     .optional(),
+  // REQ-MCP-65: the age the liquid cash buffer is needed from.
+  bufferStartAge: finite.min(18).max(100).optional(),
   // REQ-MCP-63: a CD or Treasury ladder, one rung maturing each year.
   cdLadder: z
     .strictObject({
@@ -673,6 +675,14 @@ export const historicalBacktestInput = z.strictObject({
 })
 
 // REQ-MCP-56: one GO / CAUTION / DELAY verdict for the month.
+// REQ-MCP-64: the engine's proposed plan rules.
+export const proposePlanRulesInput = z.strictObject({
+  profile: userProfileSchema.optional(),
+  portfolio: portfolioSchema.optional(),
+  asOfDate: isoDate.optional(),
+  seed: z.number().int().optional(),
+})
+
 export const planVerdictInput = z.strictObject({
   portfolio: portfolioSchema.optional(),
   profile: userProfileSchema.optional(),

@@ -1614,13 +1614,19 @@ export function projectionWarnings(
     )
   }
   for (const lump of profile.lumpSums ?? []) {
-    if (lump.age <= profile.currentAge || lump.age > planningAgeOf(profile)) {
+    // Same rule as stepYear: the sum lands in the year whose age is its whole age.
+    const arrival = Math.floor(lump.age)
+    if (
+      arrival <= profile.currentAge ||
+      arrival > planningAgeOf(profile) ||
+      !Number.isInteger(arrival - profile.currentAge)
+    ) {
       warnings.push(
-        `lump sum "${lump.name}" is ignored: age ${lump.age} is outside the projection (${profile.currentAge + 1} to ${planningAgeOf(profile)})`
+        `lump sum "${lump.name}" is ignored: age ${lump.age}${arrival === lump.age ? '' : ` (counted as ${arrival})`} is outside the projection (${profile.currentAge + 1} to ${planningAgeOf(profile)})`
       )
     } else {
       warnings.push(
-        `lump sum "${lump.name}": $${Math.round(lump.amount).toLocaleString('en-US')} after tax in today's dollars arrives at ${Math.floor(lump.age)} into taxable savings`
+        `lump sum "${lump.name}": $${Math.round(lump.amount).toLocaleString('en-US')} after tax in today's dollars arrives at ${arrival} into taxable savings`
       )
     }
   }

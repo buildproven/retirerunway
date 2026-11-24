@@ -150,6 +150,33 @@ last, the can-spend figure and the plan check. Lead with `verdict` and
 `headline`, then `reasons` and `actions` as written. The thresholds are in the
 result; say which one failed.
 
+## Build the plan rules with the owner: propose_plan_rules
+
+The owner should not have to invent the rules plan_check follows. Call
+`propose_plan_rules` (asOfDate today) when no `planRules` are saved, when the
+owner asks to set or review them, after a big change (a new snapshot after
+trades, a new retirement age, a home sale), and when plan_check's advice looks
+wrong for the plan.
+
+1. Lead with `changes` and the stock-share test: show `equityTest.rows` as a
+   table (share, success rate, forecast success rate) and say which share it
+   proposes and why, from `equityTest.basis`.
+2. Then each finding, one at a time: the rule, its current value, the
+   proposed value and the reason, as written. For the ladder, list the rungs
+   (year, age, amount, buyable now or later, penalty) and the notes.
+3. Ask the owner to approve or decline each change and addition, and to give
+   each value marked needs input (bank savings for `outsideCash`).
+4. Save only what the owner approved: start from the saved `planRules`, apply
+   the approved changes from `proposedRules`, and call `save_profile` with the
+   whole profile. Never save a rule the owner has not approved, and never
+   save from a scheduled run.
+5. Then run `plan_check` with today's date so the owner sees the trades the
+   new rules call for.
+
+The method is a heuristic the engine applies the same way every time; it is
+educational, not advice. Say that the stock share is held constant in the
+test and that ladder rungs are sized in today's dollars.
+
 ## What should I do now: plan_check
 
 The app recommends; the owner reviews and decides. Run `plan_check` with
@@ -230,14 +257,17 @@ nothing. Never trade, never change the saved profile, and write only the
    recommendation's `action` line (overdue or due sales, rebalancing, cash
    buffer) go first in the brief, as written. With no `planRules` saved, add
    the action "Save plan rules (target stock share, sell schedule)".
-6. Call `explain_change` with `previousSuccessRate` from the last runway line
+6. Call `propose_plan_rules` with `asOfDate` set to today. If `changes` is
+   above 0, add one line to the brief: "Rules: <changes> changes proposed
+   (<the rules>), review them in a chat". Never save them.
+7. Call `explain_change` with `previousSuccessRate` from the last runway line
    in `agentLog`; add its headline to the brief. Then compare with the previous runway line in `agentLog`: the success rate and
    `canSpend.monthlySpending`. Name any change of more than 5% and the likely
    cause from the briefing (new snapshot, profile change).
-7. Save one line to `agentLog` with `save_plan_notes`, newest first, keeping
+8. Save one line to `agentLog` with `save_plan_notes`, newest first, keeping
    the last 12 runway lines: `YYYY-MM-DD runway: <plan_check status>, success
 X%, can spend $Y/mo, cut at $A, raise at $B, snapshot <date>`.
-8. The final message is the brief the owner reads on a phone. Start with
+9. The final message is the brief the owner reads on a phone. Start with
    "Runway:", then at most five actions, most important first, then one line
    of figures (success rate, can spend per month, cut and raise points). Plain
    words, under 120 words. If a tool failed, say which one in one line.
@@ -373,6 +403,8 @@ Portfolio tools (holdings and tax strategy):
   with an optional survivor scenario.
 - `historical_backtest`: the plan through 1928–2025 market history.
 - `plan_verdict`: one GO / CAUTION / DELAY verdict for the month.
+- `propose_plan_rules`: the engine's proposed plan rules with a reason for each,
+  and findings against the current rules; nothing is saved.
 - `explain_change`: what moved the success rate between two snapshots.
 - `plan_check`: the snapshot against the owner's rules, with a status and
   ranked recommendations (trades, accounts, estimated tax) for review.

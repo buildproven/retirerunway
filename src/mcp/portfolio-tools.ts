@@ -25,6 +25,7 @@ import {
 import { backtestHistory } from '../engine/historical-backtest'
 import { explainChange } from '../engine/change-explainer'
 import { VERDICT_THRESHOLDS, planVerdict } from '../engine/plan-verdict'
+import { POLICY_DEFAULTS, proposePlanPolicy } from '../engine/plan-policy'
 import {
   PLAN_CHECK_DEFAULTS,
   PlanCheckError,
@@ -81,6 +82,7 @@ import {
   exploreClaimingAgesInput,
   historicalBacktestInput,
   planVerdictInput,
+  proposePlanRulesInput,
   explainChangeInput,
   portfolioAnalysisInput,
   projectRetirementInput,
@@ -1248,6 +1250,53 @@ export function registerPortfolioTools(server: McpServer): void {
               thresholds: VERDICT_THRESHOLDS,
               dollars: "today's dollars",
               nothingTraded: true,
+              ...savedAssumption(savedData),
+            },
+          }
+        ),
+      })
+    }
+  )
+
+  // REQ-MCP-64: the engine proposes the plan rules; the owner approves them.
+  server.registerTool(
+    'propose_plan_rules',
+    {
+      title: 'Propose plan rules',
+      description:
+        "Propose the owner's plan rules from the saved profile and newest snapshot (or profile/portfolio) on asOfDate (pass today's date), and check the current planRules against them. Returns the stock-share test (the plan run at 30% to 80% stocks and the current target, at long-run and 10-year forecast returns, on one seed; the proposal is the best worse-of-the-two success rate, the lower share on a tie within 1 point), a ladder that funds spending one rung a year from the retirement year through the bridge to Social Security (at most 5 rungs, sized to each year's expected withdrawals and capped by the bonds the share leaves, with early-penalty and 10-year-term flags), a cash buffer that starts a year before retirement (bufferStartAge), the sales the proposed share needs, protected taxable accounts with gains, and findings (keep, change, add, needs_input) with current value, proposed value and reason. proposedRules is a complete planRules ready for save_profile. Nothing is saved: present each finding and save only the changes the owner approves. Takes several seconds.",
+      inputSchema: proposePlanRulesInput,
+    },
+    async args => {
+      const inputs = await resolveInputs('propose_plan_rules', args)
+      if (!inputs.ok) return errorResult(inputs.errors)
+      const { portfolio, profile, savedData } = inputs
+      const seed = args.seed ?? MONTE_CARLO_DEFAULTS.DEFAULT_SEED
+      const asOfDate = args.asOfDate ?? portfolio.asOfDate
+      let proposal: ReturnType<typeof proposePlanPolicy>
+      try {
+        proposal = proposePlanPolicy(portfolio, profile, asOfDate, { seed })
+      } catch (error) {
+        if (!(error instanceof PlanCheckError)) throw error
+        return errorResult([{ field: error.field, message: error.message }])
+      }
+      return jsonResult({
+        ...proposal,
+        provenance: stamp(
+          'propose_plan_rules',
+          { ...args, portfolio, profile, asOfDate },
+          proposal,
+          {
+            seed,
+            assumptions: {
+              asOfDate,
+              snapshotDate: portfolio.asOfDate,
+              method: POLICY_DEFAULTS,
+              stockShareTest:
+                'each account rebalanced to the candidate share, totals and taxable basis kept; the share is held to the planning age',
+              ladderSizing:
+                "expected-path withdrawals less deferred-compensation payouts, today's dollars",
+              nothingSaved: true,
               ...savedAssumption(savedData),
             },
           }

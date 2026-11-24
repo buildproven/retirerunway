@@ -180,6 +180,8 @@ describe('REQ-MCP-36: privacy and size checks', () => {
     ['routing 021000021', 'account or routing number'],
     ['passport X1234567', 'government ID number'],
     ["driver's license D1234-56789", 'government ID number'],
+    ['account 2026-11-19 number 12345678', 'account or routing number'],
+    ['account number 2026-11-1912', 'account or routing number'],
     ['password: hunter2', 'password'],
     ['login pwd = s3cret!', 'password'],
   ])('REQ-MCP-36 flags %j as a %s', (text, kind) => {
@@ -193,6 +195,11 @@ describe('REQ-MCP-36: privacy and size checks', () => {
     'Call Fidelity at 800-343-3548',
     'Spending $96,000 to $128,000 from age 60 to 67',
     'Property tax 14,700 a year; HELOC 0',
+    'Imported the Fidelity account on 2026-11-19',
+    '- 2026-11-20: Fidelity 401k account snapshot 2026-11-19 saved',
+    'Medicare card arrives 2038-01-01',
+    'Fidelity account balance as of 2026-11',
+    'Roth account opened 11-19-2026',
   ])('REQ-MCP-36 allows ordinary planning text: %j', text => {
     expect(findSensitiveContent(text)).toEqual([])
   })

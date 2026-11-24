@@ -402,7 +402,12 @@ describe('REQ-MCP-37: get_briefing order, fixes, next actions and version', () =
     const b = await briefing()
     expect(b.checks).toEqual({ warnings: [], missing: [] })
     expect(b.nextActions).toEqual([
-      { action: expect.stringMatching(/^Set planRules/), tool: 'save_profile' },
+      {
+        action: expect.stringMatching(
+          /^Draft your plan rules with propose_plan_rules/
+        ),
+        tool: 'propose_plan_rules',
+      },
     ])
     await call('save_profile', {
       profile: { ...complete, planRules: { targetEquityShare: 0.64 } },
