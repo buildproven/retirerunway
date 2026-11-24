@@ -403,6 +403,27 @@ export const planRulesSchema = z.strictObject({
     )
     .max(24)
     .optional(),
+  // REQ-MCP-63: a CD or Treasury ladder, one rung maturing each year.
+  cdLadder: z
+    .strictObject({
+      accountType: z.enum(ACCOUNT_TYPES),
+      accountName: z.string().trim().min(1).max(60).optional(),
+      firstYear: z.number().int().min(2000).max(2100),
+      lastYear: z.number().int().min(2000).max(2100),
+      total: finite.min(0).max(100_000_000).optional(),
+      maxPerIssuer: finite.min(1_000).max(100_000_000).optional(),
+    })
+    .optional(),
+})
+
+// REQ-MCP-63: a current yield read from the broker, with its source and date.
+export const rateQuoteSchema = z.strictObject({
+  kind: z.enum(['cd', 'treasury']),
+  termYears: z.number().int().min(1).max(10),
+  apy: finite.min(0).max(0.2),
+  callProtected: z.boolean().optional(),
+  source: z.string().trim().min(1).max(120),
+  quotedOn: isoDate,
 })
 
 export const userProfileSchema = z.strictObject({
@@ -593,6 +614,7 @@ export const planCheckInput = z.strictObject({
   profile: userProfileSchema.optional(),
   rules: planRulesSchema.optional(),
   asOfDate: isoDate.optional(),
+  rateQuotes: z.array(rateQuoteSchema).max(40).optional(),
 })
 
 export const spendingGuardrailsInput = z.strictObject({

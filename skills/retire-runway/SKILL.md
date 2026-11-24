@@ -295,6 +295,13 @@ newAnnualContributions?, monthlySpending?, healthcareMonthly? }` for a job
   Treasury ladder funds inside a 401(k) or IRA are not liquid and never count;
   plan_check reports them as `retirementAccountCash`. Ask for the owner's bank
   savings and save them as `outsideCash`.
+- `planRules.cdLadder`: `{ accountType, firstYear, lastYear, total? }` for a
+  CD or Treasury ladder with one rung maturing each year. Before plan_check,
+  read the broker's current new-issue CD yields (call-protected) and Treasury
+  yields by term from its own rates page, and pass them as `rateQuotes`
+  (`[{ kind, termYears, apy, callProtected, source, quotedOn }]`). Give the
+  ladder recommendation rung by rung: year, amount, term, CD or
+  Treasury, yield. Never invent a rate.
 - `portfolio_analysis` returns `projection.successRate` (v2): quote that, not
   its v1 `monteCarlo`.
 

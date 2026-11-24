@@ -3,6 +3,7 @@
 // accounts never to sell from) and returns ranked recommendations for the
 // owner to review. Deterministic: the as-of date is an input, never the clock.
 // Nothing here trades; the owner places every order.
+import { CdLadderError, planCdLadder, type CdLadderPlan } from './cd-ladder'
 import { baseExpensesAt, isLiquidAccount } from './portfolio-math'
 import type {
   Account,
@@ -10,6 +11,7 @@ import type {
   Holding,
   PlanRules,
   Portfolio,
+  RateQuote,
   ScheduledSale,
   UserProfile,
 } from './types'
@@ -66,6 +68,7 @@ export type RecommendationKind =
   | 'rebalance_sell'
   | 'rebalance_buy'
   | 'cash_buffer'
+  | 'cd_ladder'
 
 export interface Recommendation {
   readonly priority: number
@@ -114,6 +117,8 @@ export interface PlanCheckResult {
   readonly tasks: readonly TaskItem[]
   readonly nextScheduledSale: ScheduleItem | null
   readonly recommendations: readonly Recommendation[]
+  /** The CD or Treasury ladder from planRules.cdLadder, or null (REQ-MCP-63). */
+  readonly cdLadder: CdLadderPlan | null
   readonly rules: Required<
     Pick<PlanRules, 'targetEquityShare' | 'driftBand' | 'minCashBufferYears'>
   > & {
@@ -306,7 +311,8 @@ export function checkPlan(
   portfolio: Portfolio,
   profile: UserProfile,
   rules: PlanRules,
-  asOfDate: string
+  asOfDate: string,
+  rateQuotes: readonly RateQuote[] = []
 ): PlanCheckResult {
   validateRules(rules)
   const today = dayNumber(asOfDate, 'asOfDate')
@@ -354,6 +360,34 @@ export function checkPlan(
     }
     if (liquid) liquidCash += cashLike
     else retirementAccountCash += cashLike
+  }
+  // Sales marked done on or after the snapshot date have happened: take them
+  // off the stock lots and count the proceeds as cash where they landed, so
+  // nothing below sells or counts the same dollars twice.
+  const doneProceeds: { accountName: string; amount: number }[] = []
+  for (const sale of rules.sellSchedule ?? []) {
+    if (sale.done !== true) continue
+    if (dayNumber(sale.dueDate, 'dueDate') < snapshotDay) continue
+    let left = sale.amount
+    for (const lot of pool) {
+      if (left <= 0.005) break
+      if (!isEquity(lot.holding)) continue
+      if (lot.holding.symbol.toUpperCase() !== sale.symbol.toUpperCase())
+        continue
+      if (
+        sale.accountType !== undefined &&
+        lot.account.accountType !== sale.accountType
+      )
+        continue
+      const take = Math.min(left, lot.remaining)
+      if (take <= 0) continue
+      lot.remaining -= take
+      left -= take
+      equityValue -= take
+      if (isLiquidAccount(lot.account.accountType)) liquidCash += take
+      else retirementAccountCash += take
+      doneProceeds.push({ accountName: lot.account.name, amount: take })
+    }
   }
   const cashBuffer = liquidCash + outsideCash
   if (totalValue <= 0)
@@ -510,13 +544,16 @@ export function checkPlan(
   const reserved = new Map<Lot, number>()
   const upcomingStock = upcoming.map(item => {
     let left = item.amount
+    const byAccount: { accountName: string; amount: number }[] = []
     for (const lot of stockLotsFor(item)) {
       const free = lot.remaining - (reserved.get(lot) ?? 0)
       const take = Math.min(left, Math.max(0, free))
       reserved.set(lot, (reserved.get(lot) ?? 0) + take)
       left -= take
+      if (take > 0)
+        byAccount.push({ accountName: lot.account.name, amount: take })
     }
-    return { item, amount: item.amount - left }
+    return { item, amount: item.amount - left, byAccount }
   })
   const upcomingCovered = upcomingStock.filter(u => u.amount > 0.005)
   const upcomingTotal = upcomingCovered.reduce((sum, u) => sum + u.amount, 0)
@@ -567,6 +604,69 @@ export function checkPlan(
     })
   }
 
+  // REQ-MCP-63: place cash that is ready now in the ladder's short rungs.
+  let cdLadder: CdLadderPlan | null = null
+  const ladderRule = rules.cdLadder
+  if (ladderRule !== undefined) {
+    const proceedsNow = [
+      ...doneProceeds,
+      ...recommendations
+        .filter(
+          rec => rec.kind === 'scheduled_sale' || rec.kind === 'rebalance_sell'
+        )
+        .flatMap(rec => rec.trades)
+        .map(trade => ({
+          accountName: trade.accountName,
+          amount: trade.amount - trade.estimatedTax,
+        })),
+    ]
+    const proceedsLater = upcomingCovered.flatMap(u => u.byAccount)
+    try {
+      cdLadder = planCdLadder(portfolio, ladderRule, {
+        asOfDate,
+        saleProceedsNow: proceedsNow,
+        saleProceedsLater: proceedsLater,
+        quotes: rateQuotes,
+      })
+    } catch (error) {
+      if (error instanceof CdLadderError)
+        throw new PlanCheckError(error.field, error.message)
+      throw error
+    }
+    if (cdLadder !== null && cdLadder.buyNowTotal > 0) {
+      const plan = cdLadder
+      const buys = plan.rungs.filter(rung => rung.buyNow > 0)
+      const accountName = plan.accountName ?? plan.accountType
+      const label = (rung: (typeof buys)[number]) =>
+        rung.quote === null
+          ? `${rung.year} ${dollars(rung.buyNow)} (${rung.termYears}-yr, no quote)`
+          : `${rung.year} ${dollars(rung.buyNow)} (${rung.termYears}-yr ${rung.quote.kind === 'cd' ? 'call-protected CD' : 'Treasury'} ${(rung.quote.apy * 100).toFixed(2)}%)`
+      const sources = [
+        ...new Set(
+          buys.flatMap(rung =>
+            rung.quote === null
+              ? []
+              : [`${rung.quote.source}, ${rung.quote.quotedOn}`]
+          )
+        ),
+      ]
+      recommendations.push({
+        kind: 'cd_ladder',
+        action: `Buy ${dollars(plan.buyNowTotal)} for your ${plan.firstYear}–${plan.lastYear} ladder in ${accountName}: ${buys.map(label).join('; ')}.`,
+        amount: plan.buyNowTotal,
+        trades: buys.map(rung => ({
+          action: 'buy' as const,
+          symbol: `${rung.quote?.kind === 'treasury' ? 'TREASURY' : 'CD'} ${rung.year}`,
+          accountName,
+          accountType: plan.accountType,
+          amount: rung.buyNow,
+          estimatedTax: 0,
+        })),
+        reason: `${dollars(plan.fundingNow)} ready in ${plan.accountType} (idle cash ${dollars(plan.idleCash)}${plan.fundingNow - plan.idleCash > 0.005 ? ` plus ${dollars(plan.fundingNow - plan.idleCash)} of sale proceeds` : ''}); each rung's target is ${dollars(plan.rungTarget)} of the ${dollars(plan.total)} ladder, earliest short rung first${sources.length > 0 ? `; quotes: ${sources.join('; ')}` : ''}${plan.notes.length > 0 ? `; ${plan.notes.join('; ')}` : ''}`,
+      })
+    }
+  }
+
   // REQ-MCP-61: overdue and due tasks, then tasks due within a week.
   const dueTaskActions = new Set<string>()
   for (const task of tasks) {
@@ -596,6 +696,7 @@ export function checkPlan(
     task: 1,
     rebalance_sell: 2,
     rebalance_buy: 2,
+    cd_ladder: 2,
     cash_buffer: 3,
   }
   const ranked = recommendations
@@ -650,6 +751,7 @@ export function checkPlan(
     tasks,
     nextScheduledSale,
     recommendations: ranked,
+    cdLadder,
     rules: {
       targetEquityShare: target,
       driftBand,

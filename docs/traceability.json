@@ -380,7 +380,8 @@
         "src/engine/historical-backtest.ts",
         "src/engine/data/market-history.ts",
         "src/engine/spending-guardrails.ts",
-        "src/engine/roth-conversion-explorer.ts"
+        "src/engine/roth-conversion-explorer.ts",
+        "src/engine/cd-ladder.ts"
       ],
       "tests": [
         "src/mcp/__tests__/server.test.ts",
@@ -423,7 +424,8 @@
         "src/engine/__tests__/spending-guardrails.test.ts",
         "src/mcp/__tests__/spending-guardrails-tool.test.ts",
         "src/engine/__tests__/roth-conversion-explorer.test.ts",
-        "src/mcp/__tests__/roth-explorer-tool.test.ts"
+        "src/mcp/__tests__/roth-explorer-tool.test.ts",
+        "src/engine/__tests__/cd-ladder.test.ts"
       ]
     },
     {

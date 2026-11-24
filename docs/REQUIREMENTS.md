@@ -530,6 +530,29 @@ holding inside a 401(k), IRA, Roth, HSA or deferred comp plan are reported as
 taxable account. The portfolio_analysis cash-buffer alert uses the same rule
 (REQ-MCP-62).
 
+`planRules.cdLadder` (`accountType`, `firstYear`, `lastYear`, optional `total`
+and `maxPerIssuer`) is a CD or Treasury ladder with one rung maturing each
+year. plan_check counts what each rung already holds (CDs, CD holdings with a
+maturity date in the name, iShares iBonds Treasury ETFs by their year), sizes
+the ladder (by default: those holdings, holdings that mature into it before
+`firstYear`, idle cash in the account type and the sell schedule's proceeds
+there) and places the cash ready now (idle cash, sales done after the snapshot
+and sales due now) in the earliest short rungs, in $1,000 units. Each rung
+gets the highest quote for its term from `rateQuotes` (`kind` cd or treasury,
+`termYears`, `apy`, `callProtected`, `source`, `quotedOn`), which the agent
+reads from the broker; callable CDs are never used, a tie goes to the Treasury,
+quotes older than 7 days are flagged, and a rung above the FDIC limit
+($250,000 per bank) is flagged to split. The buys are a `cd_ladder`
+recommendation (REQ-MCP-63).
+
+The ladder lives in one account: the account of `accountType` (whose name
+contains `accountName`, when given) that holds the most ladder money (idle
+cash, dated holdings and sale proceeds); only that account's cash and holdings
+count. A scheduled sale marked done on or after the snapshot date is taken off
+the stock lots before anything is measured, and its proceeds count as cash
+where they landed, so plan_check never sells or counts those dollars twice
+(REQ-MCP-63).
+
 `spending_guardrails` answers "how much can I spend" in dollars with
 risk-based guardrails on the same model and seed: `canSpend` is the first
 retirement year's spending without the mortgage payment (all spending phases

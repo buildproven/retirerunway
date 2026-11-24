@@ -1015,7 +1015,7 @@ export function registerPortfolioTools(server: McpServer): void {
     {
       title: 'Plan check',
       description:
-        "Measure the newest saved snapshot (or portfolio) against the owner's own rules on asOfDate (pass today's date; defaults to the snapshot date): target stock share, drift band (default 5 points), cash buffer in years of retirement spending (default 1; liquid cash only: taxable accounts plus outsideCash, never cash inside a 401(k) or IRA), sell schedule and account types never to sell from. Rules come from rules or the saved profile's planRules (save them with save_profile). Returns status (on_plan, on_schedule or action_needed), a one-line headline, the measures before and after the recommended trades, each scheduled sale's status (done, overdue, due_today, upcoming), and ranked recommendations, each with its action line, the trades by account with estimated tax, and the reason. Nothing is traded: the owner reviews and places every order. Also returns the engine's return assumptions, to compare with analyst outlooks.",
+        "Measure the newest saved snapshot (or portfolio) against the owner's own rules on asOfDate (pass today's date; defaults to the snapshot date): target stock share, drift band (default 5 points), cash buffer in years of retirement spending (default 1; liquid cash only: taxable accounts plus outsideCash, never cash inside a 401(k) or IRA), sell schedule and account types never to sell from. Rules come from rules or the saved profile's planRules (save them with save_profile). Returns status (on_plan, on_schedule or action_needed), a one-line headline, the measures before and after the recommended trades, each scheduled sale's status (done, overdue, due_today, upcoming), and ranked recommendations, each with its action line, the trades by account with estimated tax, and the reason. Nothing is traded: the owner reviews and places every order. With planRules.cdLadder (accountType, firstYear, lastYear, optional total) it also returns cdLadder: one rung per maturity year, what each already holds (CDs, CD holdings with a maturity date, iShares iBonds Treasury ETFs), and how much of the cash ready now to buy in each, earliest short rung first, in $1,000 units. Pass rateQuotes (kind cd or treasury, termYears, apy, callProtected, source, quotedOn) read from the broker's current new-issue CD and Treasury yields; each rung gets the highest call-protected quote for its term. Also returns the engine's return assumptions, to compare with analyst outlooks.",
       inputSchema: planCheckInput,
     },
     async args => {
@@ -1035,7 +1035,13 @@ export function registerPortfolioTools(server: McpServer): void {
       const asOfDate = args.asOfDate ?? portfolio.asOfDate
       let result: PlanCheckResult
       try {
-        result = checkPlan(portfolio, profile, rules, asOfDate)
+        result = checkPlan(
+          portfolio,
+          profile,
+          rules,
+          asOfDate,
+          args.rateQuotes ?? []
+        )
       } catch (error) {
         if (!(error instanceof PlanCheckError)) throw error
         return errorResult([{ field: error.field, message: error.message }])

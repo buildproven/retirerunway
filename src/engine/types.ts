@@ -424,6 +424,42 @@ export interface PlanRules {
   bufferSymbols?: string[]
   /** One-off actions that are not stock sales, such as a fund switch (REQ-MCP-61). */
   tasks?: PlanTask[]
+  /** A CD or Treasury ladder to build in one account type (REQ-MCP-63). */
+  cdLadder?: CdLadderRule
+}
+
+/** A ladder of CDs or Treasuries, one rung maturing each year (REQ-MCP-63). */
+export interface CdLadderRule {
+  /** The account type the rungs are bought in, such as 401k for a BrokerageLink window. */
+  accountType: AccountType
+  /** Part of the account's name, such as BrokerageLink, when several accounts share the type. Default: the one holding the most ladder money. */
+  accountName?: string
+  /** The first and last calendar year a rung matures. */
+  firstYear: number
+  lastYear: number
+  /**
+   * Ladder size in today's dollars, counting what already sits in it. Default:
+   * the rungs already held, holdings that mature into it, idle cash in the
+   * account type, and the sell schedule's proceeds there.
+   */
+  total?: number
+  /** Most to place with one bank in one rung before splitting it. Default $250,000 (the FDIC limit). */
+  maxPerIssuer?: number
+}
+
+/** A current yield the owner or the agent read from the broker (REQ-MCP-63). */
+export interface RateQuote {
+  kind: 'cd' | 'treasury'
+  /** Term in whole years, 1 to 10. */
+  termYears: number
+  /** Annual yield as a fraction, such as 0.048. */
+  apy: number
+  /** False for a callable CD; callable CDs are never used. */
+  callProtected?: boolean
+  /** Where the quote came from, such as "Fidelity new-issue CDs, highest yield". */
+  source: string
+  /** The date of the quote (YYYY-MM-DD). */
+  quotedOn: string
 }
 
 export interface PlanTask {
