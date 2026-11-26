@@ -1,7 +1,7 @@
-// Medicare IRMAA (REQ-MCP-44): tiers at the CMS 2026 boundaries, the
+// Medicare IRMAA (REQ-MCP-44): tiers at the CMS 2027 boundaries, the
 // two-year lookback in the projection, one surcharge per person on Medicare.
 import { describe, expect, it } from 'vitest'
-import { IRMAA_2026, irmaaCeiling, irmaaFor } from '../irmaa'
+import { IRMAA_2027, irmaaCeiling, irmaaFor } from '../irmaa'
 import { projectRetirement, projectionWarnings } from '../retirement-projection'
 import type { AccountType, Portfolio, UserProfile } from '../types'
 
@@ -34,34 +34,34 @@ function portfolio(...accounts: ReturnType<typeof account>[]): Portfolio {
 
 const yearly = (b: number, d: number) => Math.round((b + d) * 12 * 100) / 100
 
-describe('irmaaFor (CMS 2026 table)', () => {
+describe('irmaaFor (CMS 2027 table)', () => {
   it('charges nothing at or below the first threshold', () => {
-    expect(irmaaFor(218_000, 'married_filing_jointly')).toEqual({
+    expect(irmaaFor(224_000, 'married_filing_jointly')).toEqual({
       tier: 0,
       annualPerPerson: 0,
     })
-    expect(irmaaFor(109_000, 'single').tier).toBe(0)
+    expect(irmaaFor(112_000, 'single').tier).toBe(0)
   })
 
   it('moves up a tier one dollar over each threshold', () => {
-    expect(irmaaFor(218_001, 'married_filing_jointly')).toEqual({
+    expect(irmaaFor(224_001, 'married_filing_jointly')).toEqual({
       tier: 1,
-      annualPerPerson: yearly(81.2, 14.5),
+      annualPerPerson: yearly(83.7, 15.4),
     })
-    expect(irmaaFor(274_001, 'married_filing_jointly').tier).toBe(2)
-    expect(irmaaFor(342_001, 'married_filing_jointly').tier).toBe(3)
-    expect(irmaaFor(410_001, 'married_filing_jointly').tier).toBe(4)
-    expect(irmaaFor(109_001, 'single').tier).toBe(1)
+    expect(irmaaFor(282_001, 'married_filing_jointly').tier).toBe(2)
+    expect(irmaaFor(354_001, 'married_filing_jointly').tier).toBe(3)
+    expect(irmaaFor(424_001, 'married_filing_jointly').tier).toBe(4)
+    expect(irmaaFor(112_001, 'single').tier).toBe(1)
   })
 
   it('starts the top tier AT $750,000 joint / $500,000 single', () => {
     expect(irmaaFor(749_999, 'married_filing_jointly')).toEqual({
       tier: 4,
-      annualPerPerson: yearly(446.3, 83.3),
+      annualPerPerson: yearly(460.6, 88.3),
     })
     expect(irmaaFor(750_000, 'married_filing_jointly')).toEqual({
       tier: 5,
-      annualPerPerson: yearly(487, 91),
+      annualPerPerson: yearly(502.4, 96.4),
     })
     expect(irmaaFor(500_000, 'single').tier).toBe(5)
   })
@@ -72,9 +72,9 @@ describe('irmaaFor (CMS 2026 table)', () => {
   })
 
   it('gives the MAGI ceiling that keeps each tier', () => {
-    expect(irmaaCeiling(0, 'married_filing_jointly')).toBe(218_000)
-    expect(irmaaCeiling(1, 'single')).toBe(137_000)
-    expect(irmaaCeiling(IRMAA_2026.tiers.length, 'single')).toBe(Infinity)
+    expect(irmaaCeiling(0, 'married_filing_jointly')).toBe(224_000)
+    expect(irmaaCeiling(1, 'single')).toBe(141_000)
+    expect(irmaaCeiling(IRMAA_2027.tiers.length, 'single')).toBe(Infinity)
   })
 })
 
@@ -103,7 +103,7 @@ describe('IRMAA in projectRetirement', () => {
     const y65 = yearAt(r, 65)
     expect(y65.irmaaTier).toBeGreaterThan(0)
     // One person on Medicare (no spouse given): one tier's surcharge.
-    const tier = IRMAA_2026.tiers.at(y65.irmaaTier - 1)
+    const tier = IRMAA_2027.tiers.at(y65.irmaaTier - 1)
     expect(tier).toBeDefined()
     expect(y65.irmaa).toBe(
       Math.round(((tier?.partB ?? 0) + (tier?.partD ?? 0)) * 12)

@@ -154,7 +154,9 @@ export const REGRESSION_FIXTURES: readonly RegressionFixture[] = [
       age: 55,
       income: 50_000,
       spending: 60_000,
-      withdrawal: { bridge: 13_877.5 },
+      // 2027 single: $10,000 gap + tax on $50,000 ($33,400 after the
+      // $16,600 deduction: $1,280 + 12% of $20,600 = $3,752).
+      withdrawal: { bridge: 13_752 },
     },
   },
   {
@@ -169,7 +171,9 @@ export const REGRESSION_FIXTURES: readonly RegressionFixture[] = [
     ),
     expected: {
       age: 55,
-      withdrawal: { 'employer-plan': 43_042.61 },
+      // 2027 single gross-up: W - [$1,280 + 12% x (W - $29,400)] = $40,000,
+      // so 0.88W = $37,752 and W = $42,900.
+      withdrawal: { 'employer-plan': 42_900 },
       fundingGap: 0,
     },
   },
@@ -196,7 +200,8 @@ export const REGRESSION_FIXTURES: readonly RegressionFixture[] = [
       [income('social-security', 24_000, 62)],
       [spending(30_000)]
     ),
-    expected: { age: 62, income: 24_000, withdrawal: { bridge: 6_830 } },
+    // 2027 single: $6,000 gap + 10% of ($24,000 - $16,600) = $740.
+    expected: { age: 62, income: 24_000, withdrawal: { bridge: 6_740 } },
   },
   {
     id: 'spouse-and-divorced-spouse-benefit',

@@ -69,20 +69,20 @@ describe('calculateOrdinaryTax', () => {
   })
 
   it('calculates tax spanning multiple brackets for single filer', () => {
-    // $50,000 taxable income (single):
-    // 10% on first $11,925 = $1,192.50
-    // 12% on $11,925–$48,475 = $4,386.00
-    // 22% on $48,475–$50,000 = $335.50
-    const result = calculateOrdinaryTax(50000, 'single')
-    expect(result.total).toBeCloseTo(5914, 0)
+    // $60,000 taxable income (single, 2027 IRS brackets, Rev. Proc. 2026-35):
+    // 10% on first $12,800 = $1,280
+    // 12% on $12,800–$52,025 = $4,707
+    // 22% on $52,025–$60,000 = $1,754.50
+    const result = calculateOrdinaryTax(60000, 'single')
+    expect(result.total).toBeCloseTo(7741.5, 1)
     expect(result.marginalRate).toBe(0.22)
     expect(result.brackets).toHaveLength(3)
   })
 
   it('handles married filing jointly brackets', () => {
     const result = calculateOrdinaryTax(50000, 'married_filing_jointly')
-    // $50,000 MFJ: 10% on $23,850 + 12% on remainder
-    expect(result.total).toBeCloseTo(5523, 0)
+    // $50,000 MFJ (2027): 10% on $25,600 = $2,560, 12% on $24,400 = $2,928
+    expect(result.total).toBeCloseTo(5488, 0)
     expect(result.marginalRate).toBe(0.12)
   })
 
@@ -191,9 +191,10 @@ describe('estimateWithdrawalTax', () => {
 
 describe('getStandardDeduction', () => {
   it('returns correct deductions for each filing status', () => {
-    expect(getStandardDeduction('single')).toBe(15700)
-    expect(getStandardDeduction('married_filing_jointly')).toBe(31400)
-    expect(getStandardDeduction('head_of_household')).toBe(23550)
+    // 2027, IRS Rev. Proc. 2026-35
+    expect(getStandardDeduction('single')).toBe(16600)
+    expect(getStandardDeduction('married_filing_jointly')).toBe(33200)
+    expect(getStandardDeduction('head_of_household')).toBe(24925)
   })
 })
 

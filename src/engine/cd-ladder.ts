@@ -115,6 +115,13 @@ export interface LadderInputs {
   /** Upcoming scheduled sale proceeds, by account. */
   readonly saleProceedsLater: readonly SaleProceeds[]
   readonly quotes?: readonly RateQuote[]
+  /**
+   * REQ-MCP-76: each year's target, overriding the even split (a safe
+   * ladder's rung costs). Years not in the map keep the even split.
+   */
+  readonly rungTargets?: ReadonlyMap<number, number>
+  /** True for Treasury-backed rungs (TIPS): no per-bank FDIC split. */
+  readonly noIssuerLimit?: boolean
 }
 
 const DAY_MS = 86_400_000
@@ -329,20 +336,21 @@ export function planCdLadder(
   const rungs: LadderRung[] = []
   for (let year = firstYear; year <= rule.lastYear; year++) {
     const existing = sum(heldInLadder.filter(holding => holding.year === year))
-    const shortfall = Math.max(0, rungTarget - existing)
+    const target = inputs.rungTargets?.get(year) ?? rungTarget
+    const shortfall = Math.max(0, target - existing)
     const buyNow =
       Math.floor(Math.min(shortfall, left) / LADDER_UNIT) * LADDER_UNIT
     left -= buyNow
     const termYears = Math.max(1, year - asOfYear)
     const quote = bestQuote(termYears)
     const note =
-      buyNow > maxPerIssuer
+      inputs.noIssuerLimit !== true && buyNow > maxPerIssuer
         ? `split across ${Math.ceil(buyNow / maxPerIssuer)} banks: FDIC insures ${'$' + maxPerIssuer.toLocaleString('en-US')} per bank`
         : undefined
     rungs.push({
       year,
       termYears,
-      target: round2(rungTarget),
+      target: round2(target),
       existing: round2(existing),
       shortfall: round2(shortfall),
       buyNow,

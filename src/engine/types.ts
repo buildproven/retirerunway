@@ -218,6 +218,12 @@ export interface PlanGoals {
   latestAge?: number
   /** Days between plan reviews. Default 30. */
   reviewEveryDays?: number
+  /**
+   * REQ-MCP-77: true when the engine's proposed plan rules are the
+   * system's working settings, applied at each review without asking the
+   * owner; trades and purchases stay the owner's. Default false (approve).
+   */
+  autoApplyRules?: boolean
 }
 
 export interface UserProfile {
@@ -339,12 +345,70 @@ export interface UserProfile {
    */
   marketAssumptions?: MarketAssumptions
   /**
+   * Dated market data (REQ-MCP-75): current Treasury, TIPS and CD yields
+   * and the firms' 10-year stock forecasts, saved with save_market_data.
+   * When present, preset 'forecast' uses it in place of the committed
+   * MARKET_FORECAST numbers, so every review runs on current markets.
+   */
+  marketData?: MarketData
+  /**
+   * A held-to-maturity ladder of TIPS or CDs (REQ-MCP-76): each rung pays
+   * `amount` (today's dollars) in the year the owner turns `age`. The
+   * projection takes the ladder's cost (each rung discounted at its yield)
+   * out of the account it is held in and pays the rungs as income, taxed
+   * like a withdrawal from that account. TIPS rungs keep pace with the
+   * path's inflation; CD rungs are fixed in dollars.
+   */
+  safeLadder?: SafeLadder
+  /**
+   * REQ-MCP-80: a lifetime income annuity (SPIA) bought at purchaseAge with
+   * premium (today's dollars) from the accounts of accountType, paying
+   * premium x payoutRate a year from then, fixed in dollars, taxed like a
+   * withdrawal from that account. joint (default true) keeps paying after
+   * the owner's death.
+   */
+  incomeAnnuity?: IncomeAnnuity
+  /**
+   * REQ-MCP-81: how much faster than prices pre-Medicare health cover rises
+   * each year (decimal; 0.02 = 2 points above inflation). Default 0.
+   */
+  healthcareRealGrowth?: number
+  /**
+   * REQ-MCP-82: a long-term care need: annualCost (today's dollars) a year
+   * for `years` years from the owner's startAge, on top of spending.
+   */
+  longTermCare?: { startAge: number; years: number; annualCost: number }
+  /** REQ-MCP-79: the card and loan debt's interest rate (APR, decimal). */
+  consumerDebtRate?: number
+  /**
    * A gap in pay before retirement (REQ-MCP-52): the job ends at startAge,
    * months without pay follow (household spending and healthcare come from
    * savings, no contributions), then savings resume at
    * newAnnualContributions until targetRetirementAge.
    */
   incomeGap?: IncomeGap
+  /**
+   * REQ-MCP-83: moving to a new employer before retirement. The old plan is
+   * rolled into the new one ('rollIn': the Rule of 55 covers it at the final
+   * separation), left behind ('leave': open from 55 only if the change is at
+   * 55 or later, else from 59 1/2) or rolled to an IRA ('ira': from 59 1/2).
+   * Leaving starts the deferred-comp payout unless nqdcStartsAtChange is false.
+   */
+  jobChange?: JobChange
+  /** REQ-MCP-83: federal marginal rate on pay while working (default 24%). */
+  workingMarginalRate?: number
+  /**
+   * REQ-MCP-86: an FHA reverse mortgage (HECM) line opened at openAge (both
+   * borrowers 62+) as a standby: it pays off the mortgage, then is drawn only
+   * when the accounts run short. Factor, costs and growth default from HUD
+   * tables and the saved Treasury yield.
+   */
+  reverseMortgage?: {
+    openAge: number
+    principalLimitFactor?: number
+    upfrontCostRate?: number
+    growthRate?: number
+  }
   /**
    * A cut to Social Security from a calendar year (REQ-MCP-59): every
    * benefit (own, spousal, survivor) is multiplied by 1 - share from
@@ -386,6 +450,105 @@ export interface MarketAssumptions {
   inflationMean?: number
   /** Years from today these means apply before the long-run means (default 10). */
   years?: number
+  /**
+   * REQ-MCP-82: correlation of yearly stock and bond returns in the Monte
+   * Carlo, -0.9 to 0.9 (default 0: independent). Positive when inflation
+   * drives both, as in 2022.
+   */
+  stockBondCorrelation?: number
+}
+
+export interface MarketQuote {
+  /** Years to maturity. */
+  termYears: number
+  /** Yield a year, as a decimal (0.05 = 5%). */
+  rate: number
+}
+
+export interface StockForecast {
+  /** Who published it, such as 'Vanguard VCMM'. */
+  source: string
+  /** Date of the forecast, YYYY-MM-DD. */
+  asOf: string
+  /** Expected nominal US stock return a year over about 10 years. */
+  mean: number
+}
+
+/** A firm's 10-year forecast for one asset class (REQ-MCP-78). */
+export interface AssetForecast {
+  /** What it covers, such as 'Gold' or 'Non-US developed equities'. */
+  name: string
+  /** The holdings class it applies to. */
+  assetClass: AssetClass
+  /** Expected nominal return a year. */
+  mean: number
+  /** Annual volatility; defaults to the engine's figure for the class. */
+  volatility?: number
+  source: string
+  /** Date of the forecast, YYYY-MM-DD. */
+  asOf: string
+}
+
+export interface MarketData {
+  /** Date the figures were read, YYYY-MM-DD. */
+  asOfDate: string
+  /** 10-year Treasury yield (nominal). */
+  treasury10y?: number
+  /** 10-year TIPS real yield. */
+  tipsReal10y?: number
+  /** Best call-protected new-issue CD yields by term. */
+  cdYields?: MarketQuote[]
+  /** Firms' 10-year US stock return forecasts. */
+  stockForecasts?: StockForecast[]
+  /** Firms' 10-year forecasts by asset class: gold, REITs, non-US stocks and more. */
+  assetForecasts?: AssetForecast[]
+  /** Lifetime income annuity (SPIA) payout quotes by age (REQ-MCP-80). */
+  annuityQuotes?: AnnuityQuote[]
+  /** Where the figures came from (names or URLs). */
+  sources?: string[]
+}
+
+export interface IncomeAnnuity {
+  purchaseAge: number
+  premium: number
+  payoutRate: number
+  accountType: AccountType
+  joint?: boolean
+}
+
+/** A lifetime income annuity quote (REQ-MCP-80). */
+export interface AnnuityQuote {
+  /** Age at purchase (both spouses' for joint). */
+  age: number
+  /** First-year payout as a share of the premium. */
+  payoutRate: number
+  joint: boolean
+  source: string
+  asOf: string
+}
+
+export interface SafeLadderRung {
+  /** The owner's age in the year the rung pays out. */
+  age: number
+  /** Payout in today's dollars. */
+  amount: number
+  /** Real yield (TIPS) or nominal yield (CD) at purchase. */
+  yield: number
+}
+
+export interface SafeLadder {
+  instrument: 'tips' | 'cd'
+  /** The account holding the ladder; its bucket pays for it. */
+  accountType: AccountType
+  rungs: SafeLadderRung[]
+}
+
+export interface JobChange {
+  /** The owner's age when the old job ends and the new one starts. */
+  age: number
+  oldPlan: 'rollIn' | 'leave' | 'ira'
+  /** Leaving the old employer starts the NQDC payout (default true). */
+  nqdcStartsAtChange?: boolean
 }
 
 export interface IncomeGap {

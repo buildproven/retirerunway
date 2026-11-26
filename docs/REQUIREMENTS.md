@@ -724,6 +724,149 @@ profile changes to propose (planRules.outsideCash, consumerDebt, mortgage
 balance and date, home value) and saves nothing. review_plan reports free
 cash against `consumerDebt` and months of spending.
 
+**Current market data (REQ-MCP-75).** `save_market_data` saves dated market
+data on the profile (`marketData`): the 10-year Treasury yield, the 10-year
+TIPS real yield, the best call-protected CD yields by term, the firms' 10-year
+US stock forecasts and the sources, all read by the agent from dated pages.
+With it, preset `forecast` uses stocks at the forecasts' average, bonds at the
+Treasury yield and inflation at the breakeven (Treasury less TIPS) for 10
+years, in every tool, in place of the committed figures. `get_briefing` names
+`marketData` as a missing input, and warns when it is over 35 days old;
+`review_plan` lists both in `dataToRefresh`. `propose_plan_rules` and
+`review_plan` return the comparison of safe yields with stocks (`market`):
+the breakeven, the stocks' expected real return and their expected premium
+over TIPS, with a headline.
+
+**Safe ladder for the bridge (REQ-MCP-76).** The profile's `safeLadder` is a
+held-to-maturity TIPS or CD ladder: rungs of an age, an amount in today's
+dollars and the yield at purchase. The projection takes the ladder's cost
+(each rung discounted at its yield) from the account that holds it, cash and
+bonds first, and pays each rung in its year, TIPS rungs grown with the
+path's inflation and CD rungs fixed, taxed like a withdrawal from that
+account. With market data saved, `propose_plan_rules` tests ladders for the
+first 3 and 5 bridge years and the whole bridge (retirement to the year
+before Social Security), each sized to the expected withdrawals and bought at
+the saved yields (TIPS unless a CD's yield less the breakeven beats the TIPS
+real yield at a term within a year of the rung), with the best stock share of
+the rest, on the same seed. When a ladder beats no ladder by more than a
+point on the worse of long-run and forecast returns, it proposes the ladder
+(`safeLadder`), the ladder rule's years and total, and the stock share of the
+whole portfolio with the ladder counted as bonds.
+
+**The engine's rules as working settings (REQ-MCP-77).** Profile
+`goals.autoApplyRules` makes the proposed plan rules the system's working
+settings: `review_plan` then reports `rules.mode: 'auto'`, stands its verdict,
+levers and actions on the proposed rules, ladder and glide path, lists the
+changes for the agent to save with `update_profile`, and asks the owner
+nothing about them. Without it (`approve`), the owner approves each change.
+Trades and purchases are always the owner's. The scheduled check refreshes
+the market data and, in auto mode, saves the changed settings and reports
+each as a changed recommendation.
+
+**Asset classes beyond stocks and bonds (REQ-MCP-78).** Holdings fall into
+three sleeves: stocks (US, international, emerging, REITs), the safe sleeve
+(bonds, TIPS, CDs, cash, money market) and alternatives (gold and other
+commodities, crypto, other). Alternatives earn their own return (long-run
+4%, volatility 16%, drawn independently, and only when held so plans without
+them keep the same seeded results) instead of being modelled as bonds, and
+REITs count as stocks. `marketData.assetForecasts` holds the firms' 10-year
+forecasts by asset class; under preset `forecast` the near-term stock and
+alternatives means are the value-weighted forecasts of the classes the owner
+holds. `propose_plan_rules` and `review_plan` compare every saved class with
+TIPS (`market.assets`: real return, premium over the TIPS real yield, that
+premium per unit of volatility, and a verdict: below TIPS, thin, fair or
+strong), and test the alternatives share at none, today's, 5% and 10%
+(`altTest`); a better share is advice to act on (`altShare`), not a saved
+setting.
+
+**Debt against safe yields (REQ-MCP-79).** `review_plan.debt` ranks each
+debt against what safe money pays (the saved 10-year Treasury yield, else
+the 4% bond mean): card and loan debt (`consumerDebt`, `consumerDebtRate`)
+above it is paid off first and leads the actions; a mortgage more than half
+a point above it is worth extra payments, below it is kept. A missing APR is
+asked for in `dataToRefresh`.
+
+**Lifetime income annuity (REQ-MCP-80).** The profile's `incomeAnnuity`
+buys a SPIA at `purchaseAge` with `premium` (today's dollars) from the
+accounts of `accountType`, paying `premium x payoutRate` a year from then,
+fixed in dollars, taxed like a withdrawal from that account, to the
+survivor when joint. With `marketData.annuityQuotes` saved,
+`propose_plan_rules.annuityTest` tests none, 25% and 50% of the expected
+balance at Social Security age at the nearest quote (joint for a couple);
+a better result is advice (`incomeAnnuity`), not a saved setting.
+
+**Health cover rising faster than prices (REQ-MCP-81).** The profile's
+`healthcareRealGrowth` grows pre-Medicare cover by that much a year above
+inflation. When it is not set, `review_plan.stressTests` reports the plan
+with 2 points a year and the change in the chance of success.
+
+**Stress tests: correlation, care, job loss, currency (REQ-MCP-82).**
+`marketAssumptions.stockBondCorrelation` (-0.9 to 0.9, default 0) correlates
+each year's stock and bond shocks in the Monte Carlo; at 0 the draws and
+seeded results are unchanged. `longTermCare` {startAge, years, annualCost}
+adds a care cost (today's dollars) for those years while the owner lives.
+`review_plan.stressTests` also reports, each only when the profile does not
+already model it: correlation 0.5 (2022-style), a care need of $74,400 a year
+(national median assisted living, CareScout 2025) for 3 years from 85, a
+year out of work from 55, and lump sums worth 20% less (currency).
+
+**Job change and the Rule of 55 (REQ-MCP-83).** The profile's `jobChange`
+{age, oldPlan, nqdcStartsAtChange?} moves the owner to a new employer before
+retirement. `rollIn` keeps the old 401(k) in the employer plan, so the Rule
+of 55 covers it at the final separation; `ira`, or `leave` before 55, moves
+it to the IRA bucket (penalty-free from 59 1/2); `leave` at 55 or later keeps
+it open. Leaving the old employer starts the NQDC payout at the change age
+unless `nqdcStartsAtChange` is false. When the profile has no job change and
+the owner is under 54, `review_plan.stressTests` compares a change at 54 with
+a roll-in and with an IRA rollover, and `humanChecks` asks the new plan's
+administrator to confirm roll-ins when the Rule of 55 bears on the plan.
+
+**Law figures kept current (REQ-MCP-84).** Every law or benefit table the
+engine uses is registered in `law-tables.ts` with its year, its source and
+when the next year's figures are normally published (federal tax tables by
+mid-November, Medicare premiums and IRMAA by end of November, ACA applicable
+percentages by September, HHS poverty guidelines by mid-February, the
+Social Security Trustees Report by mid-July). When the law on the date is
+ahead of a table, `get_briefing` warns and `review_plan.dataToRefresh` says
+which tables are behind and where the new figures are published; a yearly
+scheduled check updates them in an engine release. The federal tables are
+for 2027 (Rev. Proc. 2026-35) and IRMAA for 2027 (CMS, Nov 17, 2026). The
+projection adds the extra standard deduction for each person 65 or older
+($1,700 married, $2,100 unmarried) and the senior deduction ($6,000 per
+person 65+, phased out 6% above $75,000 / $150,000 MAGI) in tax years
+2025-2028 only (OBBBA §70103; listed in `LAW_SUNSETS`).
+
+**Asset location (REQ-MCP-85).** `review_plan.assetLocation` adds up
+stocks, bonds and cash by place (taxable, pre-tax, Roth/HSA) and proposes
+swaps of $5,000 or more, in whole thousands, that keep the overall mix: bonds
+held in taxable against stocks held pre-tax (taxable cash stays as the
+buffer), and bonds or cash in Roth/HSA against pre-tax stocks. Protected
+account types are left alone. Each swap is an action, with the interest no
+longer taxed each year at the saved Treasury yield.
+
+**Reverse mortgage standby (REQ-MCP-86).** The profile's `reverseMortgage`
+{openAge} opens an FHA HECM line once both borrowers are 62: the principal
+limit is the HUD factor at a 6% expected rate (62: 35.7%, 72: 41.6%, 90:
+61.8%, straight line between) times the home value capped at the 2026 FHA
+limit ($1,249,125); it pays off the mortgage (whose payment then stops) and
+3% upfront costs, and the rest is a line growing at the Treasury yield plus
+2%, drawn only to cover a shortfall, adding no income or tax, and repaid
+from the home on a sale (never more than the proceeds). When the home is
+kept and the profile has none, `review_plan.reverseMortgageTest` compares a
+line at the earliest age with none, and a gain of 2 points or more is an
+action with a HUD counselor check.
+
+**TIPS gap years (REQ-MCP-87).** No TIPS mature 2037-2039 until the
+January 10-year auctions create them (Jan 2027 for 2037, Jan 2028 for 2038,
+Jan 2029 for 2039). `tipsGapYears(asOfDate)` lists the years still missing;
+`propose_plan_rules` adds a dated task per TIPS ladder rung in a gap year
+(`tips-gap-<year>`, due 15 January of its auction year) and a note naming the
+bracket alternative (extra July 2036 and February 2040 TIPS), and
+`plan_check` labels such a rung "hold it in short Treasuries and buy at the
+January auction" instead of naming a TIPS that does not exist.
+
+The ranked list of what is covered and what is not is `docs/GAP-REVIEW.md`.
+
 `spending_guardrails` answers "how much can I spend" in dollars with
 risk-based guardrails on the same model and seed: `canSpend` is the first
 retirement year's spending without the mortgage payment (all spending phases

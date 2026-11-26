@@ -9,6 +9,10 @@
 // and seed give the same output (NFR-01). No AI.
 // ---------------------------------------------------------------------------
 
+import {
+  reverseMortgagePlan,
+  type ReverseMortgagePlan,
+} from './reverse-mortgage'
 import { MONTE_CARLO_DEFAULTS } from './config'
 import {
   annualExpensesAt,
@@ -16,10 +20,17 @@ import {
   calculateEquityFraction,
   calculatePortfolioValue,
   homeSaleAt,
+  mortgageBalanceAtYearStart,
   mortgagePaymentEndAge,
 } from './portfolio-math'
 import { IRMAA_LOOKBACK_YEARS, irmaaCeiling, irmaaFor } from './irmaa'
-import { meansForYear, resolveMarketAssumptions } from './market-assumptions'
+import {
+  holdingsNearTerm,
+  meansForYear,
+  resolveMarketAssumptions,
+} from './market-assumptions'
+import { ALT_DEFAULTS, sleeveForecast, sleeveShares } from './asset-classes'
+import { safeLadderIncomeAt, withoutLadderCost } from './safe-ladder'
 import {
   EARLIEST_SURVIVOR_AGE,
   FULL_RETIREMENT_AGE,
@@ -36,6 +47,8 @@ import {
   calculateOrdinaryTax,
   getFederalBrackets,
   getStandardDeduction,
+  AGED_ADDITIONAL_DEDUCTION,
+  seniorDeduction,
 } from './tax-brackets'
 import type { FilingStatus } from './tax-brackets'
 import type {
@@ -318,6 +331,8 @@ interface Context {
   readonly nqdcStart: number
   readonly nqdcYears: number
   readonly separationAge: number
+  /** REQ-MCP-86: the reverse mortgage line, when the profile has one. */
+  readonly hecm?: ReverseMortgagePlan
   readonly conversion: RothConversionStrategy
   readonly conversionEndAge: number
   readonly withdrawalOrder: WithdrawalOrder
@@ -371,6 +386,32 @@ function spouseAgeAt(profile: UserProfile, age: number): number | undefined {
   return spouse === undefined
     ? undefined
     : spouse.currentAge + (age - profile.currentAge)
+}
+
+/**
+ * REQ-MCP-83: the federal rate on deferred comp paid while the owner still
+ * works (the 24% bracket, where most such pay lands); profile
+ * workingMarginalRate overrides it.
+ */
+export const WORKING_MARGINAL_RATE = 0.24
+
+/** REQ-MCP-84: the calendar (tax) year of the owner's `age`. */
+function taxYearAt(ctx: Context, age: number): number {
+  return Number(ctx.asOfDate.slice(0, 4)) + (age - ctx.profile.currentAge)
+}
+
+/** REQ-MCP-84: people alive and 65 or older in `age`'s year. */
+function seniorsAt(ctx: Context, age: number): number {
+  const profile = ctx.profile
+  const scenario = profile.survivor
+  const spouseGone =
+    scenario !== undefined &&
+    scenario.deceased === 'spouse' &&
+    age > scenario.deathAge
+  const ownerCounts = !ownerDeadAt(profile, age) && age >= 65
+  const spouseAge = spouseAgeAt(profile, age)
+  const spouseCounts = spouseAge !== undefined && !spouseGone && spouseAge >= 65
+  return (ownerCounts ? 1 : 0) + (spouseCounts ? 1 : 0)
 }
 
 /** REQ-MCP-55: true from the year after the owner's death (with a spouse). */
@@ -554,7 +595,12 @@ function healthcareAt(
   age: number,
   inflation: number
 ): number {
-  const annual = profile.preMedicareHealthcare ?? 0
+  // REQ-MCP-81: health cover can rise faster than prices.
+  const growth = Math.pow(
+    1 + (profile.healthcareRealGrowth ?? 0),
+    Math.max(0, age - profile.currentAge)
+  )
+  const annual = (profile.preMedicareHealthcare ?? 0) * growth
   if (annual <= 0) return 0
   // REQ-MCP-55: after the owner's death the survivor buys cover even
   // before the owner's retirement age.
@@ -568,6 +614,31 @@ function healthcareAt(
   if (spouseAge !== undefined && spouseAge < MEDICARE_AGE)
     return annual * 0.5 * inflation
   return 0
+}
+
+/** REQ-MCP-82: the long-term care cost in `age`'s year, nominal. */
+function longTermCareAt(
+  profile: UserProfile,
+  age: number,
+  inflation: number
+): number {
+  const care = profile.longTermCare
+  if (care === undefined) return 0
+  const inCare = age >= care.startAge && age < care.startAge + care.years
+  return inCare && !ownerDeadAt(profile, age)
+    ? Math.max(0, care.annualCost) * inflation
+    : 0
+}
+
+/** REQ-MCP-83: the old plan loses Rule of 55 access at a job change. */
+export function jobChangeClosesOldPlan(profile: UserProfile): boolean {
+  const change = profile.jobChange
+  if (change === undefined || change.age >= profile.targetRetirementAge)
+    return false
+  return (
+    change.oldPlan === 'ira' ||
+    (change.oldPlan === 'leave' && change.age < RULE_OF_55_AGE)
+  )
 }
 
 function employerPlanOpen(ctx: Context, age: number): boolean {
@@ -701,22 +772,47 @@ function taxFor(
   pension: number,
   other: number,
   inflation: number,
-  conversion = 0
+  conversion = 0,
+  age?: number
 ): TaxResult {
   const w = draws.withdrawals
   const preTax = w.employerPlan + w.ira + conversion
   const gainsNominal = w.taxable * gainFraction
-  const otherOrdinary = preTax + w.nqdc + pension + other
+  // REQ-MCP-83: deferred comp paid while still drawing a salary is taxed on
+  // top of the pay, which the model does not hold: at the working marginal
+  // rate instead of through the brackets from zero.
+  const worked =
+    age === undefined ||
+    age >= ctx.profile.targetRetirementAge ||
+    ownerDeadAt(ctx.profile, age)
+      ? 0
+      : 1 - gapShareAt(ctx.profile, age)
+  const stackedNqdc = w.nqdc * worked
+  const stackedTax =
+    stackedNqdc * (ctx.profile.workingMarginalRate ?? WORKING_MARGINAL_RATE)
+  const otherOrdinary = preTax + (w.nqdc - stackedNqdc) + pension + other
   const taxableBenefit = taxableSocialSecurity(
     socialSecurity,
     otherOrdinary + gainsNominal,
     ctx.filingStatus
   )
   const ordinary = (otherOrdinary + taxableBenefit) / inflation
-  const taxableOrdinary = Math.max(
-    0,
-    ordinary - getStandardDeduction(ctx.filingStatus)
-  )
+  // REQ-MCP-84: the extra deduction at 65, and the senior deduction in its
+  // tax years (2025-2028), for each person alive and 65 or older.
+  const seniors = age === undefined ? 0 : seniorsAt(ctx, age)
+  const magiNominal = otherOrdinary + taxableBenefit + gainsNominal
+  const deduction =
+    getStandardDeduction(ctx.filingStatus) +
+    seniors * AGED_ADDITIONAL_DEDUCTION[ctx.filingStatus] +
+    (age === undefined
+      ? 0
+      : seniorDeduction(
+          taxYearAt(ctx, age),
+          seniors,
+          magiNominal,
+          ctx.filingStatus
+        ) / inflation)
+  const taxableOrdinary = Math.max(0, ordinary - deduction)
   const gains = (w.taxable * gainFraction) / inflation
   const federal =
     calculateOrdinaryTax(taxableOrdinary, ctx.filingStatus).total +
@@ -726,10 +822,10 @@ function taxFor(
     ? w.nqdc + other + w.taxable * gainFraction
     : preTax + w.nqdc + pension + other + w.taxable * gainFraction
   return {
-    federal: federal * inflation,
+    federal: federal * inflation + stackedTax,
     state: stateRate * stateBase,
     penalty: EARLY_WITHDRAWAL_PENALTY * draws.penalized,
-    agi: otherOrdinary + taxableBenefit + gainsNominal,
+    agi: otherOrdinary + stackedNqdc + taxableBenefit + gainsNominal,
     taxableOrdinary,
   }
 }
@@ -844,6 +940,11 @@ interface PathState {
   employerPlan457: number
   /** AGI by age in today's dollars, for IRMAA's two-year lookback. */
   readonly agiByAge: Map<number, number>
+  /** REQ-MCP-80: the income annuity's yearly payout once bought (nominal). */
+  annuityPayout?: number
+  /** REQ-MCP-86: the reverse mortgage line left and the loan owed (nominal). */
+  hecmLine?: number
+  hecmLoan?: number
 }
 
 /**
@@ -921,6 +1022,12 @@ function stepYear(
     balances.taxable += payout
     state.taxableBasis += payout
   }
+  // REQ-MCP-83: an old plan moved to an IRA, or left behind before 55,
+  // loses the Rule of 55; it is then open only from 59 1/2, like an IRA.
+  if (jobChangeClosesOldPlan(profile) && age === profile.jobChange?.age) {
+    balances.ira += balances.employerPlan
+    balances.employerPlan = 0
+  }
   if (profile.incomeGap !== undefined && age === profile.incomeGap.startAge) {
     // After-tax severance is basis in the taxable account.
     const severance = Math.max(0, profile.incomeGap.severance ?? 0) * inflation
@@ -934,12 +1041,34 @@ function stepYear(
     balances.taxable += amount
     state.taxableBasis += amount
   }
+  // REQ-MCP-86: the reverse mortgage line opens, paying off the mortgage
+  // and its costs; it and the loan grow from the next year.
+  const hecm = ctx.hecm
+  if (hecm !== undefined && hecm.opens) {
+    if (age === hecm.openAge) {
+      const year = taxYearAt(ctx, age)
+      const payoff = mortgageBalanceAtYearStart(profile, year)
+      state.hecmLine = Math.max(
+        0,
+        (hecm.principalLimit - hecm.upfrontCosts) * inflation - payoff
+      )
+      state.hecmLoan = hecm.upfrontCosts * inflation + payoff
+    } else if (age > hecm.openAge && state.hecmLine !== undefined) {
+      state.hecmLine *= 1 + hecm.growthRate
+      state.hecmLoan = (state.hecmLoan ?? 0) * (1 + hecm.growthRate)
+    }
+  }
   if (profile.homeSale !== undefined && age === profile.homeSale.age) {
     // Proceeds are basis: the gain on a main home is assumed within the
     // $250,000/$500,000 exclusion, so they add no income (or MAGI).
+    // REQ-MCP-86: a reverse mortgage is repaid first, never more than the
+    // proceeds (non-recourse), and the line closes.
+    const owed = state.hecmLoan ?? 0
+    state.hecmLine = undefined
+    state.hecmLoan = undefined
     const proceeds = Math.max(
       0,
-      homeSaleAt(profile, ctx.asOfDate)?.netProceeds ?? 0
+      (homeSaleAt(profile, ctx.asOfDate)?.netProceeds ?? 0) - owed
     )
     balances.taxable += proceeds
     state.taxableBasis += proceeds
@@ -958,10 +1087,42 @@ function stepYear(
       ? coupleSpending
       : survivorSpending(ctx, age, coupleSpending)) +
     gapSpendingAt(profile, age, gap, inflation)
-  const healthcare = healthcareAt(profile, age, inflation)
+  // The ACA credit covers the health insurance premium only, never the
+  // long-term care cost added on top of it.
+  const insurance = healthcareAt(profile, age, inflation)
+  const healthcare = insurance + longTermCareAt(profile, age, inflation)
   const socialSecurity = socialSecurityAt(profile, age, inflation, ctx.asOfDate)
-  const { pension, other } = otherIncomeAt(profile, age)
-  const income = socialSecurity + pension + other
+  const base = otherIncomeAt(profile, age)
+  // REQ-MCP-76: a held-to-maturity ladder pays its rung for this age.
+  const ladder = safeLadderIncomeAt(profile, age, inflation)
+  // REQ-MCP-80: an income annuity is bought in its year and pays from then.
+  const annuity = profile.incomeAnnuity
+  if (annuity !== undefined && age === Math.floor(annuity.purchaseAge)) {
+    const bucket = bucketOf(annuity.accountType)
+    const paid = Math.min(
+      Math.max(0, annuity.premium) * inflation,
+      Math.max(0, balances[bucket])
+    )
+    balances[bucket] -= paid
+    state.annuityPayout = paid * Math.max(0, annuity.payoutRate)
+  }
+  const annuityIncome =
+    annuity !== undefined &&
+    (annuity.joint !== false || !ownerDeadAt(profile, age))
+      ? (state.annuityPayout ?? 0)
+      : 0
+  const annuityTaxed =
+    annuity !== undefined && bucketOf(annuity.accountType) !== 'roth'
+      ? annuityIncome
+      : 0
+  const pension = base.pension + ladder.taxed + annuityTaxed
+  const other = base.other
+  const income =
+    socialSecurity +
+    pension +
+    other +
+    ladder.untaxed +
+    (annuityIncome - annuityTaxed)
   const irmaa = irmaaAt(ctx, age, state, inflation)
   const medicareCosts = healthcare + irmaa.amount
 
@@ -1018,13 +1179,23 @@ function stepYear(
       withCredit
         ? acaCreditFor(
             ctx,
-            healthcare,
+            insurance,
             magiFor(gainFraction, d, socialSecurity, pension, other, c),
             inflation
           )
         : 0
     const taxOf = (d: Draws, c: number): TaxResult =>
-      taxFor(ctx, gainFraction, d, socialSecurity, pension, other, inflation, c)
+      taxFor(
+        ctx,
+        gainFraction,
+        d,
+        socialSecurity,
+        pension,
+        other,
+        inflation,
+        c,
+        age
+      )
     let conversion = 0
     let extra = Math.max(0, spending + medicareCosts - income - forcedTotal)
     let draws = drawDown(ctx, age, balances, forced, extra, available457)
@@ -1118,15 +1289,29 @@ function stepYear(
     irmaaTier: irmaa.tier,
     rothConversion: conversion,
     socialSecurity,
-    otherIncome: pension + other,
+    otherIncome:
+      pension + other + ladder.untaxed + (annuityIncome - annuityTaxed),
     withdrawals: { ...w },
     rmd: forced.employerPlan + forced.ira,
     federalTax: tax.federal,
     stateTax: tax.state,
     penalty: tax.penalty,
-    shortfall: draws.shortfall,
+    shortfall: hecmCovered(state, draws.shortfall),
     balances: { ...balances },
   }
+}
+
+/**
+ * REQ-MCP-86: a reverse mortgage line covers what the accounts cannot.
+ * Draws are loan proceeds, so they add no income, tax or MAGI. Returns the
+ * shortfall left.
+ */
+function hecmCovered(state: PathState, shortfall: number): number {
+  if (shortfall <= 0 || state.hecmLine === undefined) return shortfall
+  const draw = Math.min(shortfall, Math.max(0, state.hecmLine))
+  state.hecmLine -= draw
+  state.hecmLoan = (state.hecmLoan ?? 0) + draw
+  return shortfall - draw
 }
 
 /**
@@ -1214,12 +1399,24 @@ function contextFor(
     householdSize:
       profile.householdSize ?? (profile.spouse === undefined ? 1 : 2),
     // REQ-MCP-57: an election tied to leaving the job starts at separation.
+    // REQ-MCP-83: leaving the old employer for a new one is a separation.
     nqdcStart:
-      profile.nqdcPayout?.onSeparation === true
-        ? separationAge
-        : (profile.nqdcPayout?.startAge ?? profile.targetRetirementAge),
+      profile.jobChange !== undefined &&
+      profile.jobChange.age < profile.targetRetirementAge &&
+      profile.jobChange.nqdcStartsAtChange !== false &&
+      profile.nqdcPayout !== undefined
+        ? Math.min(
+            profile.jobChange.age,
+            profile.nqdcPayout.onSeparation === true
+              ? separationAge
+              : (profile.nqdcPayout.startAge ?? profile.targetRetirementAge)
+          )
+        : profile.nqdcPayout?.onSeparation === true
+          ? separationAge
+          : (profile.nqdcPayout?.startAge ?? profile.targetRetirementAge),
     nqdcYears: Math.max(1, profile.nqdcPayout?.years ?? 1),
     separationAge,
+    hecm: reverseMortgagePlan(profile, portfolio.asOfDate),
     conversion: options.rothConversion ?? { kind: 'none' },
     conversionEndAge: options.conversionEndAge ?? RMD_START_AGE - 1,
     withdrawalOrder:
@@ -1334,11 +1531,36 @@ export interface ProjectionOptions {
  * stream as runMonteCarlo; every bucket earns the portfolio's blended
  * return. A path succeeds when no year runs short before the planning age.
  */
+/**
+ * REQ-MCP-78: each year's means with the alternatives sleeve added, and the
+ * near-term stock and alternatives means set from the classes held when
+ * asset forecasts are saved (preset 'forecast').
+ */
+function sleeveMeansFor(portfolio: Portfolio, profile: UserProfile) {
+  const near = holdingsNearTerm(
+    profile,
+    (sleeve, fallback) =>
+      sleeveForecast(portfolio, profile.marketData, sleeve, fallback),
+    ALT_DEFAULTS.mean
+  )
+  return (i: number) => {
+    const m = meansForYear(profile, i)
+    const inNear = i < near.years
+    return {
+      ...m,
+      equity: inNear && near.equity !== undefined ? near.equity : m.equity,
+      alt: inNear && near.alt !== undefined ? near.alt : ALT_DEFAULTS.mean,
+    }
+  }
+}
+
 export function projectRetirement(
-  portfolio: Portfolio,
+  fullPortfolio: Portfolio,
   profile: UserProfile,
   options: ProjectionOptions = {}
 ): RetirementProjection {
+  // REQ-MCP-76: the ladder's cost leaves the account that holds it.
+  const portfolio = withoutLadderCost(fullPortfolio, profile).portfolio
   const seed = options.seed ?? MONTE_CARLO_DEFAULTS.DEFAULT_SEED
   const paths = options.paths ?? PROJECTION_PATHS
   const planningAge = planningAgeOf(profile)
@@ -1354,6 +1576,22 @@ export function projectRetirement(
   const totalValue = calculatePortfolioValue(portfolio)
   const equity = calculateEquityFraction(portfolio, totalValue)
   const M = MONTE_CARLO_DEFAULTS
+  // REQ-MCP-78: alternatives (gold, commodities, crypto) are their own sleeve.
+  const altShare = sleeveShares(portfolio).alt
+  const sleeveMeansAt = sleeveMeansFor(portfolio, profile)
+  const rho = Math.max(
+    -0.9,
+    Math.min(0.9, profile.marketAssumptions?.stockBondCorrelation ?? 0)
+  )
+  const sleeveReturn = (
+    share: number,
+    stocks: number,
+    bonds: number,
+    alts: number
+  ) => {
+    const alt = Math.min(altShare, Math.max(0, 1 - share))
+    return share * stocks + alt * alts + Math.max(0, 1 - share - alt) * bonds
+  }
 
   // Expected-return path (REQ-MCP-51: near-term means, then long-run).
   const expectedYears: ProjectionYear[] = []
@@ -1362,10 +1600,15 @@ export function projectRetirement(
     let inflation = 1
     for (let i = 0; i < years; i++) {
       const age = profile.currentAge + i + 1
-      const means = meansForYear(profile, i)
+      const means = sleeveMeansAt(i)
       inflation *= 1 + means.inflation
       const share = glideShareAt(profile.glidePath, age, equity)
-      const expectedReturn = share * means.equity + (1 - share) * means.bond
+      const expectedReturn = sleeveReturn(
+        share,
+        means.equity,
+        means.bond,
+        means.alt
+      )
       const flow = stepYear(ctx, age, state, inflation, expectedReturn)
       expectedYears.push(toProjectionYear(profile, flow, inflation))
     }
@@ -1373,7 +1616,9 @@ export function projectRetirement(
 
   // Monte Carlo.
   const rand = seededRandom(seed)
-  const byYear: number[][] = Array.from({ length: years }, () => [])
+  // One slot per year the loop below steps (Math.ceil(years) times when an
+  // age reaches the engine fractional, as the MCP schema allowed before).
+  const byYear: number[][] = Array.from({ length: Math.ceil(years) }, () => [])
   const depletionAges: number[] = []
   let successes = 0
   for (let path = 0; path < paths; path++) {
@@ -1382,15 +1627,32 @@ export function projectRetirement(
     let depletedAt: number | null = null
     for (let i = 0; i < years; i++) {
       const age = profile.currentAge + i + 1
-      const means = meansForYear(profile, i)
-      const equityReturn =
-        means.equity + M.EQUITY_STD_DEV * boxMullerNormal(rand)
-      const bondReturn = means.bond + M.BOND_STD_DEV * boxMullerNormal(rand)
+      const means = sleeveMeansAt(i)
+      const equityShock = boxMullerNormal(rand)
+      const equityReturn = means.equity + M.EQUITY_STD_DEV * equityShock
+      // REQ-MCP-82: the bond shock leans on the stock shock by the chosen
+      // correlation; at 0 it is the same independent draw as before.
+      const bondShock =
+        rho === 0
+          ? boxMullerNormal(rand)
+          : rho * equityShock + Math.sqrt(1 - rho * rho) * boxMullerNormal(rand)
+      const bondReturn = means.bond + M.BOND_STD_DEV * bondShock
       const drawnInflation =
         means.inflation + M.INFLATION_STD_DEV * boxMullerNormal(rand)
+      // Drawn last, and only when alternatives are held, so plans without
+      // them keep byte-identical results for the same seed.
+      const altReturn =
+        altShare > 0
+          ? means.alt + ALT_DEFAULTS.stdDev * boxMullerNormal(rand)
+          : 0
       inflation *= 1 + Math.max(drawnInflation, 0)
       const share = glideShareAt(profile.glidePath, age, equity)
-      const portfolioReturn = share * equityReturn + (1 - share) * bondReturn
+      const portfolioReturn = sleeveReturn(
+        share,
+        equityReturn,
+        bondReturn,
+        altReturn
+      )
       const flow = stepYear(ctx, age, state, inflation, portfolioReturn)
       if (depletedAt === null && flow.shortfall > 1) depletedAt = age
       byYear[i].push(
@@ -1509,10 +1771,12 @@ export interface SequenceResult {
  * and inflation. Same rules as projectRetirement.
  */
 export function projectSequence(
-  portfolio: Portfolio,
+  fullPortfolio: Portfolio,
   profile: UserProfile,
   sequence: readonly (MarketYear | undefined)[]
 ): SequenceResult {
+  // REQ-MCP-76: the ladder's cost leaves the account that holds it.
+  const portfolio = withoutLadderCost(fullPortfolio, profile).portfolio
   const planningAge = planningAgeOf(profile)
   const years = Math.max(0, planningAge - profile.currentAge)
   const start = startingBuckets(portfolio)
@@ -1527,23 +1791,27 @@ export function projectSequence(
     portfolio,
     calculatePortfolioValue(portfolio)
   )
+  const altShare = sleeveShares(portfolio).alt
+  const sleeveMeansAt = sleeveMeansFor(portfolio, profile)
   let inflation = 1
   let depletionAge: number | null = null
   const balanceByAge: { age: number; total: number }[] = []
   for (let i = 0; i < years; i++) {
     const age = profile.currentAge + i + 1
     const market = sequence[i]
-    const means = meansForYear(profile, i)
+    const means = sleeveMeansAt(i)
     const stocks = market?.stocks ?? means.equity
     const bonds = market?.bonds ?? means.bond
     inflation *= 1 + (market?.inflation ?? means.inflation)
     const share = glideShareAt(profile.glidePath, age, equity)
+    // REQ-MCP-78: no history for alternatives here; they earn their mean.
+    const alt = Math.min(altShare, Math.max(0, 1 - share))
     const flow = stepYear(
       ctx,
       age,
       state,
       inflation,
-      share * stocks + (1 - share) * bonds
+      share * stocks + alt * means.alt + Math.max(0, 1 - share - alt) * bonds
     )
     if (depletionAge === null && flow.shortfall > 1) depletionAge = age
     balanceByAge.push({
@@ -1689,10 +1957,34 @@ export function projectionWarnings(
 ): string[] {
   const warnings: string[] = []
   if (profile.marketAssumptions !== undefined) {
-    const market = resolveMarketAssumptions(profile.marketAssumptions)
+    const market = resolveMarketAssumptions(
+      profile.marketAssumptions,
+      profile.marketData
+    )
     const pct = (value: number) => `${(value * 100).toFixed(1)}%`
     warnings.push(
       `market assumptions: stocks ${pct(market.nearTerm.equity)}, bonds ${pct(market.nearTerm.bond)} and inflation ${pct(market.nearTerm.inflation)} a year for the first ${market.years} years (${market.source}), then the long-run ${pct(market.longRun.equity)}, ${pct(market.longRun.bond)} and ${pct(market.longRun.inflation)}`
+    )
+  }
+  if (profile.safeLadder !== undefined && profile.safeLadder.rungs.length > 0) {
+    const { cost, shortfall } = withoutLadderCost(portfolio, profile)
+    const ladder = profile.safeLadder
+    const ages = ladder.rungs.map(r => r.age)
+    warnings.push(
+      `safe ladder: ${ladder.instrument === 'tips' ? 'TIPS' : 'CD'} rungs paying ages ${Math.min(...ages)}-${Math.max(...ages)} cost $${Math.round(cost).toLocaleString('en-US')} today, taken from the ${ladder.accountType} accounts${shortfall > 1 ? ` ($${Math.round(shortfall).toLocaleString('en-US')} more than they hold, not counted)` : ''}; each rung is paid as income in its year${ladder.instrument === 'tips' ? ' and keeps pace with inflation' : ', fixed in dollars'}. Balances shown exclude the ladder`
+    )
+    if (
+      ladder.rungs.some(r => r.age < 59.5) &&
+      ladder.accountType !== 'brokerage'
+    )
+      warnings.push(
+        'safe ladder: rungs paid before 59½ from a retirement account may carry the 10% penalty (the Rule of 55 lifts it for a 401(k) left in or after the year you turn 55); the projection does not charge it on rungs'
+      )
+  }
+  if (profile.incomeAnnuity !== undefined) {
+    const a = profile.incomeAnnuity
+    warnings.push(
+      `income annuity: $${Math.round(a.premium).toLocaleString('en-US')} (today's dollars) from the ${a.accountType} accounts at ${a.purchaseAge} buys ${(a.payoutRate * 100).toFixed(1)}% a year for life${a.joint === false ? ' (owner only)' : ' (joint)'}, fixed in dollars, taxed like a withdrawal from that account; the payout rate is the quote saved, not a guarantee of the rate available then`
     )
   }
   for (const lump of profile.lumpSums ?? []) {
@@ -1730,6 +2022,38 @@ export function projectionWarnings(
     warnings.push(
       `the NQDC payout starts when you leave the job (age ${profile.incomeGap !== undefined && profile.incomeGap.startAge < profile.targetRetirementAge ? profile.incomeGap.startAge : (profile.separationAge ?? profile.targetRetirementAge)}), paid over ${Math.max(1, profile.nqdcPayout.years)} years`
     )
+  }
+  const hecm = reverseMortgagePlan(profile, portfolio.asOfDate)
+  if (profile.reverseMortgage !== undefined) {
+    const k = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`
+    if (hecm === undefined)
+      warnings.push('reverseMortgage is ignored: the profile has no home value')
+    else if (!hecm.opens)
+      warnings.push(
+        `reverse mortgage at ${hecm.openAge} does not open: the principal limit (${k(hecm.principalLimit)}) does not cover the mortgage payoff (${k(hecm.mortgagePayoff)}) and costs (${k(hecm.upfrontCosts)}), or the home is sold first`
+      )
+    else
+      warnings.push(
+        `reverse mortgage line at ${hecm.openAge} (youngest borrower ${hecm.youngestAge}): ${(hecm.principalLimitFactor * 100).toFixed(1)}% of ${k(hecm.maxClaim)} = ${k(hecm.principalLimit)}, less ${k(hecm.upfrontCosts)} costs and ${k(hecm.mortgagePayoff)} mortgage payoff, leaves a ${k(hecm.line)} line (today's dollars) growing ${(hecm.growthRate * 100).toFixed(2)}% a year; the mortgage payment stops at ${hecm.openAge}, the line is drawn only when the accounts run short, and the loan is repaid from the home when it is sold`
+      )
+  }
+  const change = profile.jobChange
+  if (change !== undefined) {
+    if (change.age >= profile.targetRetirementAge) {
+      warnings.push('jobChange is ignored: it is at or after retirement')
+    } else {
+      const where =
+        change.oldPlan === 'rollIn'
+          ? 'the old 401(k) is rolled into the new plan, so the Rule of 55 covers it when you leave the new job at 55 or later (confirm the new plan accepts roll-ins)'
+          : jobChangeClosesOldPlan(profile)
+            ? `the old 401(k) ${change.oldPlan === 'ira' ? 'moves to an IRA' : 'is left behind before 55'}, so it is open without the 10% penalty only from 59½`
+            : 'the old 401(k) is left behind at 55 or later, so the Rule of 55 keeps it open'
+      const nqdc =
+        profile.nqdcPayout !== undefined && change.nqdcStartsAtChange !== false
+          ? `; leaving starts the NQDC payout at ${change.age} (check your election)`
+          : ''
+      warnings.push(`job change at ${change.age}: ${where}${nqdc}`)
+    }
   }
   const gap = profile.incomeGap
   if (gap !== undefined) {

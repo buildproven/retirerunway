@@ -3,6 +3,7 @@
 // engine as the /api/v1 routes do, and stamps each result with provenance.
 // import_positions can save a snapshot, and a tool called without
 // `portfolio` or `profile` uses the saved ones (REQ-MCP-13, REQ-MCP-14).
+import { IRMAA_2027 } from '../engine/irmaa'
 import type { McpServer } from '@modelcontextprotocol/server'
 import type { CallToolResult } from '@modelcontextprotocol/server'
 import { generateAlerts, isCalendarDate } from '../engine/alerts'
@@ -1020,7 +1021,7 @@ export function registerPortfolioTools(server: McpServer): void {
               conversionTaxPaidFrom:
                 'the portfolio, by the usual withdrawal order',
               cliffMargin: `conversions stop $${CLIFF_MARGIN} below an IRMAA or ACA cliff`,
-              irmaa: 'CMS 2026 table, two-year lookback',
+              irmaa: `CMS ${IRMAA_2027.year} table, two-year lookback`,
               samePortfolioSeedAndPlanningAgeForEveryStrategy: true,
               ...savedAssumption(savedData),
             },

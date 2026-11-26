@@ -43,6 +43,7 @@ const SKILL_TOOLS = [
   'rank_levers',
   'review_plan',
   'run_tool',
+  'save_market_data',
   'save_plan_notes',
   'save_profile',
   'spending_guardrails',

@@ -244,6 +244,53 @@ describe('propose_plan_rules: buffer, accounts, sales, inputs', () => {
     expect(proposal.proposedRules.tasks).toEqual(currentRules.tasks)
   })
 
+  it('replaces its own earlier sales on the next review instead of adding to them', () => {
+    const first = proposePlanPolicy(
+      portfolio,
+      { ...profile, planRules: { ...currentRules, sellSchedule: [] } },
+      '2026-11-24',
+      run
+    )
+    const again = proposePlanPolicy(
+      portfolio,
+      { ...profile, planRules: first.proposedRules },
+      '2026-11-24',
+      run
+    )
+    const ids = (again.proposedRules.sellSchedule ?? []).map(s => s.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    const total = (rules: typeof first.proposedRules) =>
+      (rules.sellSchedule ?? [])
+        .filter(s => s.id.startsWith('policy-'))
+        .reduce((sum, s) => sum + s.amount, 0)
+    expect(total(again.proposedRules)).toBe(total(first.proposedRules))
+    // The same sales worked out again are kept, not reported as a change.
+    const sales = again.findings.find(f => f.rule === 'sellSchedule')
+    expect(sales?.status).toBe('keep')
+    expect(
+      again.findings.some(
+        f => f.rule === 'sellSchedule' && f.status === 'change'
+      )
+    ).toBe(false)
+    // Different earlier sales (here half the size) are replaced: a change.
+    const halved = {
+      ...first.proposedRules,
+      sellSchedule: (first.proposedRules.sellSchedule ?? []).map(s =>
+        s.id.startsWith('policy-') ? { ...s, amount: s.amount / 2 } : s
+      ),
+    }
+    const shifted = proposePlanPolicy(
+      portfolio,
+      { ...profile, planRules: halved },
+      '2026-11-24',
+      run
+    )
+    expect(shifted.findings.find(f => f.rule === 'sellSchedule')?.status).toBe(
+      'change'
+    )
+    expect(total(shifted.proposedRules)).toBe(total(first.proposedRules))
+  })
+
   it('schedules the sales a lower share needs, monthly on the 15th, in $1,000 units', () => {
     const forced = proposePlanPolicy(
       portfolio,

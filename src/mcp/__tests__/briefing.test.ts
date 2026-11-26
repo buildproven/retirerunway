@@ -47,6 +47,11 @@ const complete: UserProfile = {
   annualContributions: 40_000,
   withdrawalTaxRate: 0.1,
   spendingPhases: [{ startAge: 60, annualExpenses: 128_000 }],
+  marketData: {
+    asOfDate: new Date().toISOString().slice(0, 10),
+    treasury10y: 0.05,
+    tipsReal10y: 0.029,
+  },
 }
 
 let client: Client
@@ -128,9 +133,12 @@ describe('REQ-MCP-34: the server sends its own agent instructions', () => {
     expect(SERVER_INSTRUCTIONS).toMatch(/Never compute or estimate a figure/)
   })
 
-  it('REQ-MCP-34 tells the agent to have the owner reconnect when a new tool is missing', () => {
+  it('REQ-MCP-34 sends a missing new tool through run_tool, and asks for a reconnect only when run_tool is missing too', () => {
     expect(SERVER_INSTRUCTIONS).toMatch(
-      /names a tool this chat cannot call, tell the owner to reconnect/
+      /names a tool this chat cannot call, call it with run_tool/
+    )
+    expect(SERVER_INSTRUCTIONS).toMatch(
+      /only if run_tool is missing too.{0,80}tell the owner to reconnect/
     )
   })
 
@@ -258,6 +266,7 @@ describe('REQ-MCP-33: missingInputs', () => {
       'annualContributions',
       'spendingPhases',
       'socialSecurityMonthly',
+      'marketData',
       'withdrawalTaxRate',
     ])
   })
@@ -270,6 +279,7 @@ describe('REQ-MCP-33: missingInputs', () => {
       socialSecurityAge: 67,
       socialSecurityMonthly: 3_000,
       withdrawalTaxRate: 0.12,
+      marketData: { asOfDate: '2026-11-24', treasury10y: 0.05 },
     }
     expect(missingInputs(retired, true)).toEqual([])
   })

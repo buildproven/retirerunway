@@ -48,61 +48,115 @@ export interface WithdrawalTaxEstimate {
   effectiveRate: number
 }
 
-// 2026 Federal Income Tax Brackets (projected, indexed for inflation)
+// 2027 federal income tax brackets, standard deductions and capital gains
+// thresholds: IRS Rev. Proc. 2026-35 (2027 inflation adjustments, Nov 5,
+// 2026; IR-2026-133). The projection's first year is 2027 and it holds these
+// in today's dollars. The year and source are registered in law-tables.ts
+// (REQ-MCP-84) so the briefing flags them when the next year's are out.
+export const FEDERAL_TAX_YEAR = 2027
+
 const FEDERAL_BRACKETS: Record<FilingStatus, TaxBracket[]> = {
   single: [
-    { min: 0, max: 11925, rate: 0.1 },
-    { min: 11925, max: 48475, rate: 0.12 },
-    { min: 48475, max: 103350, rate: 0.22 },
-    { min: 103350, max: 197300, rate: 0.24 },
-    { min: 197300, max: 250525, rate: 0.32 },
-    { min: 250525, max: 626350, rate: 0.35 },
-    { min: 626350, max: Infinity, rate: 0.37 },
+    { min: 0, max: 12800, rate: 0.1 },
+    { min: 12800, max: 52025, rate: 0.12 },
+    { min: 52025, max: 109125, rate: 0.22 },
+    { min: 109125, max: 208325, rate: 0.24 },
+    { min: 208325, max: 264550, rate: 0.32 },
+    { min: 264550, max: 661375, rate: 0.35 },
+    { min: 661375, max: Infinity, rate: 0.37 },
   ],
   married_filing_jointly: [
-    { min: 0, max: 23850, rate: 0.1 },
-    { min: 23850, max: 96950, rate: 0.12 },
-    { min: 96950, max: 206700, rate: 0.22 },
-    { min: 206700, max: 394600, rate: 0.24 },
-    { min: 394600, max: 501050, rate: 0.32 },
-    { min: 501050, max: 751600, rate: 0.35 },
-    { min: 751600, max: Infinity, rate: 0.37 },
+    { min: 0, max: 25600, rate: 0.1 },
+    { min: 25600, max: 104050, rate: 0.12 },
+    { min: 104050, max: 218250, rate: 0.22 },
+    { min: 218250, max: 416650, rate: 0.24 },
+    { min: 416650, max: 529100, rate: 0.32 },
+    { min: 529100, max: 793650, rate: 0.35 },
+    { min: 793650, max: Infinity, rate: 0.37 },
   ],
   head_of_household: [
-    { min: 0, max: 17000, rate: 0.1 },
-    { min: 17000, max: 64850, rate: 0.12 },
-    { min: 64850, max: 103350, rate: 0.22 },
-    { min: 103350, max: 197300, rate: 0.24 },
-    { min: 197300, max: 250500, rate: 0.32 },
-    { min: 250500, max: 626350, rate: 0.35 },
-    { min: 626350, max: Infinity, rate: 0.37 },
+    { min: 0, max: 18250, rate: 0.1 },
+    { min: 18250, max: 69650, rate: 0.12 },
+    { min: 69650, max: 109100, rate: 0.22 },
+    { min: 109100, max: 208300, rate: 0.24 },
+    { min: 208300, max: 264550, rate: 0.32 },
+    { min: 264550, max: 661350, rate: 0.35 },
+    { min: 661350, max: Infinity, rate: 0.37 },
   ],
 }
 
-// Long-term capital gains rates (2026 thresholds)
+// Long-term capital gains rates (2027 thresholds, Rev. Proc. 2026-35 §3.03)
 const LTCG_BRACKETS: Record<FilingStatus, TaxBracket[]> = {
   single: [
-    { min: 0, max: 48350, rate: 0.0 },
-    { min: 48350, max: 533400, rate: 0.15 },
-    { min: 533400, max: Infinity, rate: 0.2 },
+    { min: 0, max: 51050, rate: 0.0 },
+    { min: 51050, max: 563200, rate: 0.15 },
+    { min: 563200, max: Infinity, rate: 0.2 },
   ],
   married_filing_jointly: [
-    { min: 0, max: 96700, rate: 0.0 },
-    { min: 96700, max: 600050, rate: 0.15 },
-    { min: 600050, max: Infinity, rate: 0.2 },
+    { min: 0, max: 102100, rate: 0.0 },
+    { min: 102100, max: 633600, rate: 0.15 },
+    { min: 633600, max: Infinity, rate: 0.2 },
   ],
   head_of_household: [
-    { min: 0, max: 64750, rate: 0.0 },
-    { min: 64750, max: 566700, rate: 0.15 },
-    { min: 566700, max: Infinity, rate: 0.2 },
+    { min: 0, max: 68350, rate: 0.0 },
+    { min: 68350, max: 598400, rate: 0.15 },
+    { min: 598400, max: Infinity, rate: 0.2 },
   ],
 }
 
-// Standard deductions (2026 projected)
+// Standard deductions (2027, Rev. Proc. 2026-35 §3.15)
 const STANDARD_DEDUCTION: Record<FilingStatus, number> = {
-  single: 15700,
-  married_filing_jointly: 31400,
-  head_of_household: 23550,
+  single: 16600,
+  married_filing_jointly: 33200,
+  head_of_household: 24925,
+}
+
+/**
+ * REQ-MCP-84: the extra standard deduction for each person 65 or older
+ * (2027, Rev. Proc. 2026-35): $1,700 when married, $2,100 when unmarried.
+ */
+export const AGED_ADDITIONAL_DEDUCTION: Record<FilingStatus, number> = {
+  single: 2100,
+  married_filing_jointly: 1700,
+  head_of_household: 2100,
+}
+
+/**
+ * REQ-MCP-84: the senior deduction (OBBBA §70103), tax years 2025-2028:
+ * $6,000 per person 65 or older, less 6% of MAGI above $75,000 ($150,000
+ * joint). Not indexed. Returns the nominal deduction.
+ */
+export const SENIOR_DEDUCTION = {
+  perPerson: 6000,
+  firstYear: 2025,
+  lastYear: 2028,
+  phaseOutRate: 0.06,
+  threshold: { single: 75000, joint: 150000 },
+} as const
+
+export function seniorDeduction(
+  taxYear: number,
+  seniors: number,
+  magi: number,
+  filingStatus: FilingStatus
+): number {
+  if (
+    seniors <= 0 ||
+    taxYear < SENIOR_DEDUCTION.firstYear ||
+    taxYear > SENIOR_DEDUCTION.lastYear
+  )
+    return 0
+  const threshold =
+    filingStatus === 'married_filing_jointly'
+      ? SENIOR_DEDUCTION.threshold.joint
+      : SENIOR_DEDUCTION.threshold.single
+  // The phase-out applies to each person's $6,000.
+  const each = Math.max(
+    0,
+    SENIOR_DEDUCTION.perPerson -
+      SENIOR_DEDUCTION.phaseOutRate * Math.max(0, magi - threshold)
+  )
+  return each * seniors
 }
 
 export function calculateOrdinaryTax(

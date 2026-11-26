@@ -371,6 +371,9 @@
         "src/engine/retirement-projection.ts",
         "src/engine/scenario-comparison.ts",
         "src/engine/irmaa.ts",
+        "src/engine/law-tables.ts",
+        "src/engine/asset-location.ts",
+        "src/engine/reverse-mortgage.ts",
         "src/engine/plan-check.ts",
         "src/engine/change-explainer.ts",
         "src/engine/plan-verdict.ts",
@@ -389,7 +392,9 @@
         "src/engine/withdrawal-order.ts",
         "src/engine/balance-sheet.ts",
         "src/mcp/tool-door.ts",
-        "src/mcp/profile-patch.ts"
+        "src/mcp/profile-patch.ts",
+        "src/engine/safe-ladder.ts",
+        "src/engine/asset-classes.ts"
       ],
       "tests": [
         "src/mcp/__tests__/server.test.ts",
@@ -440,7 +445,17 @@
         "src/engine/__tests__/balance-sheet.test.ts",
         "src/engine/__tests__/withdrawal-glide.test.ts",
         "src/mcp/__tests__/balances-orders-tool.test.ts",
-        "src/mcp/__tests__/tool-door.test.ts"
+        "src/mcp/__tests__/tool-door.test.ts",
+        "src/engine/__tests__/market-data-safe-ladder.test.ts",
+        "src/engine/__tests__/asset-classes.test.ts",
+        "src/engine/__tests__/debt-and-annuity.test.ts",
+        "src/engine/__tests__/stress-tests.test.ts",
+        "src/engine/__tests__/tips-gap.test.ts",
+        "src/engine/__tests__/asset-location.test.ts",
+        "src/engine/__tests__/reverse-mortgage.test.ts",
+        "src/engine/__tests__/law-tables.test.ts",
+        "src/engine/__tests__/law-tables.test.ts",
+        "src/engine/__tests__/job-change.test.ts"
       ]
     },
     {

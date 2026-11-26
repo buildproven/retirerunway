@@ -31,10 +31,30 @@ export interface IrmaaTable {
 }
 
 /**
+ * 2027 amounts, from 2025 MAGI (CMS 2027 Medicare Parts A & B premiums and
+ * deductibles, Nov 17, 2026). Thresholds below the top tier are indexed to
+ * inflation each year, so the projection holds them, and the surcharges,
+ * flat in today's dollars. Registered in law-tables.ts (REQ-MCP-84).
+ */
+export const IRMAA_2027: IrmaaTable = {
+  year: 2027,
+  source:
+    'https://www.cms.gov/newsroom/fact-sheets/2027-medicare-parts-b-premiums-deductibles',
+  standardPartB: 209.4,
+  tiers: [
+    { overSingle: 112_000, overJoint: 224_000, partB: 83.7, partD: 15.4 },
+    { overSingle: 141_000, overJoint: 282_000, partB: 209.4, partD: 39.7 },
+    { overSingle: 177_000, overJoint: 354_000, partB: 335.0, partD: 64.0 },
+    { overSingle: 212_000, overJoint: 424_000, partB: 460.6, partD: 88.3 },
+    { overSingle: 500_000, overJoint: 750_000, partB: 502.4, partD: 96.4 },
+  ],
+  topSingle: 500_000,
+  topJoint: 750_000,
+}
+
+/**
  * 2026 amounts, from 2024 MAGI (CMS fact sheet, Nov 14, 2025:
  * https://www.cms.gov/newsroom/fact-sheets/2026-medicare-parts-b-premiums-deductibles).
- * Thresholds below the top tier are indexed to inflation each year, so the
- * projection holds them, and the surcharges, flat in today's dollars.
  */
 export const IRMAA_2026: IrmaaTable = {
   year: 2026,
@@ -69,7 +89,7 @@ export interface IrmaaResult {
 export function irmaaFor(
   magi: number,
   filingStatus: FilingStatus,
-  table: IrmaaTable = IRMAA_2026
+  table: IrmaaTable = IRMAA_2027
 ): IrmaaResult {
   const joint = filingStatus === 'married_filing_jointly'
   const top = joint ? table.topJoint : table.topSingle
@@ -92,7 +112,7 @@ export function irmaaFor(
 export function irmaaCeiling(
   tier: number,
   filingStatus: FilingStatus,
-  table: IrmaaTable = IRMAA_2026
+  table: IrmaaTable = IRMAA_2027
 ): number {
   const joint = filingStatus === 'married_filing_jointly'
   const next = table.tiers.at(tier)

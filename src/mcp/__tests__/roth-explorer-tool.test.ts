@@ -1,5 +1,6 @@
 // @vitest-environment node
 // explore_roth_conversions through the MCP server (REQ-MCP-46).
+import { IRMAA_2027 } from '../../engine/irmaa'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -132,6 +133,11 @@ describe('REQ-MCP-46: explore_roth_conversions', () => {
     }
     expect(stamp.seed).toBe(42)
     expect(stamp.assumptions.savedData).toBeDefined()
+    // REQ-MCP-84: the stamp names the IRMAA table the engine actually uses.
+    expect(stamp.assumptions.irmaa).toBe(
+      `CMS ${IRMAA_2027.year} table, two-year lookback`
+    )
+    expect(String(stamp.assumptions.irmaa)).not.toContain('2026')
   }, 60_000)
 
   it('REQ-MCP-46 takes a custom list and stops at conversionEndAge', async () => {

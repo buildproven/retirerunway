@@ -1,15 +1,19 @@
 // The open-source export (NFR-07): private sections dropped, private paths
 // left out, plugin links pointed at the public repo, and the denylist scan
 // finds what is left.
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const { dropSections, isExcluded, publicPlugin, scan } =
+const { dropSections, exportPublic, isExcluded, publicPlugin, scan } =
   require('../export-public.js') as {
+    exportPublic: (
+      root: string,
+      dest: string
+    ) => { files: number; hits: string[] }
     dropSections: (text: string, headings: string[]) => string
     isExcluded: (file: string) => boolean
     publicPlugin: (text: string) => string
@@ -83,4 +87,23 @@ describe('NFR-07 public export', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  // The publish job only runs when the version changes; this catches a
+  // private detail the moment it lands, not at the next release. Skipped in
+  // the public copy, which has no denylist.
+  const root = join(__dirname, '..', '..')
+  it.skipIf(!existsSync(join(root, '.public-export/denylist.txt')))(
+    'exports this repository with no denylist hit',
+    () => {
+      const dest = mkdtempSync(join(tmpdir(), 'rr-export-'))
+      try {
+        const { files, hits } = exportPublic(root, dest)
+        expect(files).toBeGreaterThan(100)
+        expect(hits).toEqual([])
+      } finally {
+        rmSync(dest, { recursive: true, force: true })
+      }
+    },
+    120_000
+  )
 })

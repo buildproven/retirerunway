@@ -286,6 +286,92 @@ storage, with `compareWithPlan` adding the checks against the saved profile
 and snapshot. review_plan calls the order explorer too, about 5 more
 projections. See ADR-011.
 
+### 2.aa Current markets and the safe ladder (REQ-MCP-75..77)
+
+`marketDataMeans` (`src/engine/market-assumptions.ts`) turns the profile's
+`marketData` into the 10-year means; `resolveMarketAssumptions` and
+`meansForYear` take it, so every projection under preset `forecast` follows
+the saved data, and its date is in the provenance through the profile hash.
+`src/engine/safe-ladder.ts` prices rungs (`rungCost`, `ladderCost`), takes
+the cost out of the portfolio (`withoutLadderCost`, called at the start of
+`projectRetirement` and `projectSequence`) and pays rungs in `stepYear`
+(`safeLadderIncomeAt`, taxed with pension income for pre-tax accounts).
+`chooseInstrument` compares a CD's yield less the breakeven with the TIPS
+real yield. `proposePlanPolicy` runs `testSafeLadders` after the stock-share
+test: each ladder is priced, the rest is rebalanced to each candidate share,
+and the cost is handed back as cash in front so the projection's own
+deduction leaves the tested share. `compareMarket` gives the premium of
+stocks over TIPS. `reviewPlan` with `goals.autoApplyRules` builds the
+reviewed profile from `proposedRules`, the proposed ladder and glide path
+before the verdict and levers run. `save_market_data` validates with
+`marketDataSchema`. See ADR-013.
+
+### 2.ab Asset classes and the alternatives sleeve (REQ-MCP-78)
+
+`src/engine/asset-classes.ts` maps each asset class to a sleeve
+(`sleeveOf`), measures the sleeves (`sleeveShares`), weights saved class
+forecasts by the owner's holdings (`sleeveForecast`), compares classes with
+TIPS (`compareAssets`) and rescales the alternatives sleeve for a test
+(`withAltShare`). `retirement-projection.ts` builds each year's means with
+`sleeveMeansFor` (the near-term overrides come from `holdingsNearTerm` in
+`market-assumptions.ts`) and returns `share × stocks + alt × alternatives +
+rest × bonds`, the glide path setting the stock share and the alternatives
+share held at its snapshot weight. The alternatives draw comes after the
+stock, bond and inflation draws and only when alternatives are held. The
+historical replay gives alternatives their mean (no history kept). See
+ADR-014.
+
+### 2.ac Debt, income annuity, healthcare growth (REQ-MCP-79..81)
+
+`reviewPlan` builds `debt` from the profile's debts and the saved Treasury
+yield, puts pay-first debts at the head of `actions`, and runs one extra
+projection for `stressTests` (health cover +2%/yr) when the profile has no
+rate of its own. `stepYear` buys `incomeAnnuity` in its year (the premium,
+capped at the bucket's balance, leaves the account's bucket; the payout is
+kept in the path state) and adds the payout to pension-like income.
+`proposePlanPolicy` runs `annuityTest` at Social Security age. `healthcareAt`
+grows cover by `healthcareRealGrowth`. See ADR-015 and GAP-REVIEW.md.
+
+### 2.ad Stress tests (REQ-MCP-82)
+
+The Monte Carlo draws the stock shock first and builds the bond shock as
+`rho x stock + sqrt(1 - rho^2) x fresh`; with `rho` 0 it draws exactly as
+before, so seed-42 results do not move. `longTermCareAt` adds the care cost to
+the healthcare line in its years. `reviewPlan` runs one projection per stress
+the profile does not already model and reports the change in success; none
+changes saved settings.
+
+### 2.ae Job change (REQ-MCP-83)
+
+`stepYear` moves the employer-plan balance to the IRA bucket in the change
+year when `jobChangeClosesOldPlan`; access then follows the IRA rule.
+`contextFor` starts the NQDC payout at the earlier of the change age and the
+saved start. `reviewPlan` runs the two change stresses.
+
+### 2.af Law tables (REQ-MCP-84)
+
+`lawTablesBehind(asOfDate)` compares each table's year with the year due on
+that date; the briefing passes today's date and the review its asOfDate, so
+results stay reproducible. `taxFor` takes the owner's age to count people 65
+or older and the tax year (asOfDate's year plus years ahead) for the senior
+deduction, figured on nominal MAGI and converted to today's dollars.
+
+### 2.ag Asset location and reverse mortgage (REQ-MCP-85, REQ-MCP-86)
+
+`assetLocation` reads the snapshot only. `reverseMortgagePlan` is pure;
+`contextFor` keeps it on the context, `stepYear` opens the line in its year
+(the payoff is the scheduled mortgage balance that year), grows line and loan
+together, `hecmCovered` draws it against the year's shortfall after the
+withdrawal and tax loop, and a home sale repays it first.
+`mortgagePaymentEndAge` ends the payment at the opening age.
+
+### 2.ah TIPS gap years (REQ-MCP-87)
+
+`safe-ladder.ts` dates the last TIPS maturity below the gap from asOfDate
+(the January 10-year auction around the 20th adds one year) and maps ladder
+rungs to calendar years. `proposePlanPolicy` appends gap tasks to the
+proposed rules once (same id, kept); `checkPlan` relabels gap-year rungs.
+
 ## 3. The planner pipeline (FR-01..FR-12)
 
 1. **Intake** (`intake.ts`) validates form values and builds an immutable

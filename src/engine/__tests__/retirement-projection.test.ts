@@ -1,5 +1,6 @@
 // The v2 retirement projection (REQ-MCP-39, REQ-MCP-40): values, not shape.
 import { describe, expect, it } from 'vitest'
+import { userProfileSchema } from '../../mcp/schemas'
 import { calculatePortfolioValue } from '../portfolio-math'
 import {
   DEFAULT_PLANNING_AGE,
@@ -323,6 +324,43 @@ describe('REQ-MCP-40: household, horizon, success rate and charts', () => {
       { paths: 10 }
     )
     expect(to90.expectedPath.years.at(-1)?.age).toBe(90)
+  })
+
+  it('REQ-MCP-40 takes whole-year current and planning ages only', () => {
+    expect(userProfileSchema.safeParse(base).success).toBe(true)
+    for (const bad of [
+      { ...base, currentAge: 53.5 },
+      { ...base, planningAge: 95.5 },
+      {
+        ...base,
+        filingStatus: 'married_joint' as const,
+        spouse: { currentAge: 51.5 },
+      },
+      // Whole ages for retirement, claiming and spending phases too: the
+      // historical replay and phase lookups index by whole age.
+      { ...base, targetRetirementAge: 60.5 },
+      { ...base, socialSecurityAge: 67.5 },
+      { ...base, spendingPhases: [{ startAge: 65.5, annualExpenses: 1 }] },
+    ]) {
+      expect(userProfileSchema.safeParse(bad).success).toBe(false)
+    }
+  })
+
+  it('REQ-MCP-40 projects a fractional current or planning age without failing', () => {
+    for (const profile of [
+      { ...base, currentAge: 53.5 },
+      { ...base, planningAge: 95.5 },
+    ]) {
+      const result = projectRetirement(mixed, profile, { paths: 10 })
+      expect(result.monteCarlo.percentiles).toHaveLength(
+        result.expectedPath.years.length
+      )
+      expect(result.monteCarlo.percentiles.map(p => p.age)).toEqual(
+        result.expectedPath.years.map(y => y.age)
+      )
+      expect(result.monteCarlo.successRate).toBeGreaterThanOrEqual(0)
+      expect(result.monteCarlo.successRate).toBeLessThanOrEqual(1)
+    }
   })
 
   it("REQ-MCP-40 adds the spouse's Social Security from the spouse's own claiming age", () => {

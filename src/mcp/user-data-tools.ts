@@ -2,12 +2,18 @@
 // REQ-MCP-17..18, REQ-MCP-33, REQ-MCP-35..37). They read and write the user's profile and position
 // snapshots in the store the environment names (src/mcp/git-store.ts
 // openDataStore): a private GitHub repo folder, else $RETIRE_RUNWAY_DATA_DIR.
+import { lawTablesMessage } from '../engine/law-tables'
 import type { McpServer } from '@modelcontextprotocol/server'
 import packageJson from '../../package.json'
 import {
   calculatePortfolioValue,
   mortgagePayoffWarning,
 } from '../engine/portfolio-math'
+import {
+  MARKET_DATA_STALE_DAYS,
+  marketDataAgeDays,
+} from '../engine/market-assumptions'
+import { compareMarket } from '../engine/plan-policy'
 import type { UserProfile } from '../engine/types'
 import { UserProfileSchema } from '../lib/validation-schemas'
 import type { FieldError } from './portfolio-tools'
@@ -16,6 +22,7 @@ import { jsonResult } from './result'
 import {
   deleteUserDataInput,
   noInput,
+  saveMarketDataInput,
   savePlanNotesInput,
   saveProfileInput,
   updateProfileInput,
@@ -114,6 +121,14 @@ export function missingInputs(
       fixWith: 'save_profile',
     })
   }
+  // REQ-MCP-75: recommendations follow today's markets only with market data.
+  if (profile.marketData === undefined) {
+    missing.push({
+      field: 'marketData',
+      why: "no market data: the forecast returns use figures committed with the app and no TIPS or CD ladder is tested; search today's 10-year Treasury and TIPS yields, the best call-protected CD yields by term and the firms' 10-year stock forecasts, then call save_market_data",
+      fixWith: 'save_market_data',
+    })
+  }
   if (profile.withdrawalTaxRate === undefined) {
     missing.push({
       field: 'withdrawalTaxRate',
@@ -122,6 +137,21 @@ export function missingInputs(
     })
   }
   return missing
+}
+
+/** A warning when saved market data is older than MARKET_DATA_STALE_DAYS (REQ-MCP-75). */
+export function marketDataWarning(
+  profile: UserProfile | undefined,
+  today: string
+): BriefingWarning | undefined {
+  const data = profile?.marketData
+  if (data === undefined) return undefined
+  const age = marketDataAgeDays(data, today)
+  if (age <= MARKET_DATA_STALE_DAYS) return undefined
+  return {
+    message: `market data is from ${data.asOfDate} (${age} days old): search today's Treasury, TIPS and CD yields and the firms' stock forecasts, save them with save_market_data, then run review_plan so the recommendations follow current markets`,
+    fixWith: 'save_market_data',
+  }
 }
 
 /**
@@ -228,10 +258,20 @@ export function registerUserDataTools(
         profile === undefined
           ? undefined
           : mortgagePayoffWarning(profile.profile)
+      const marketWarning = marketDataWarning(
+        profile?.profile,
+        new Date().toISOString().slice(0, 10)
+      )
+      // REQ-MCP-84: the engine's tax and benefit figures against the law.
+      const lawMessage = lawTablesMessage(new Date().toISOString().slice(0, 10))
       const warnings: BriefingWarning[] = [
+        ...(lawMessage === undefined
+          ? []
+          : [{ message: lawMessage, fixWith: 'an engine release' }]),
         ...(payoffWarning === undefined
           ? []
           : [{ message: payoffWarning, fixWith: 'save_profile' }]),
+        ...(marketWarning === undefined ? [] : [marketWarning]),
         ...notesWarnings(sections),
       ]
       const missing = missingInputs(profile?.profile, snapshots.length > 0)
@@ -415,6 +455,52 @@ export function registerUserDataTools(
       )
       if (!saved.ok) return errorResult([saved.error])
       return jsonResult({ ok: true, changed: patched.changed, ...saved.value })
+    }
+  )
+
+  // REQ-MCP-75: the market data every forecast-return run uses.
+  server.registerTool(
+    'save_market_data',
+    {
+      title: 'Save market data',
+      description:
+        "Save today's market data on the profile (marketData), replacing the last: asOfDate, the 10-year Treasury yield (treasury10y), the 10-year TIPS real yield (tipsReal10y), the best call-protected new-issue CD yields by term (cdYields [{ termYears, rate }]), the firms' 10-year US stock forecasts (stockForecasts [{ source, asOf, mean }]), the firms' 10-year forecasts by asset class (assetForecasts [{ name, assetClass, mean, volatility?, source, asOf }]: gold and broad commodities as commodity, REITs as reit, non-US developed as intl_equity, emerging as emerging_equity, US value or growth as us_equity, bonds as us_bond), lifetime annuity payout quotes (annuityQuotes [{ age, payoutRate, joint, source, asOf }]) and sources. Rates are decimals (0.05 = 5%). Read every figure from a current source (Treasury or FRED for yields, the broker's CD page, the firms' own outlooks) and name it in sources. From then on the forecast returns in project_retirement, plan_verdict, propose_plan_rules and review_plan use these figures (stocks at the forecasts' average, bonds at the Treasury yield, inflation at the breakeven), and propose_plan_rules tests locking the bridge years in a TIPS or CD ladder at these yields. Returns the comparison of safe yields with stocks and of every asset class with TIPS. Needs a saved profile.",
+      inputSchema: saveMarketDataInput,
+    },
+    async ({ marketData }) => {
+      const read = await fromStore(async () =>
+        openDataStore('save_market_data').readProfile()
+      )
+      if (!read.ok) return errorResult([read.error])
+      if (read.value === undefined)
+        return errorResult([
+          {
+            field: 'profile',
+            message: 'no profile saved yet: call save_profile first',
+          },
+        ])
+      const merged = { ...read.value.profile, marketData }
+      const shape = userProfileSchema.safeParse(merged)
+      if (!shape.success)
+        return errorResult(
+          shape.error.issues.map(issue => ({
+            field: ['profile', ...issue.path.map(String)].join('.'),
+            message: issue.message,
+          }))
+        )
+      const saved = await fromStore(async () =>
+        openDataStore('save_market_data').saveProfile(
+          shape.data as UserProfile,
+          new Date().toISOString()
+        )
+      )
+      if (!saved.ok) return errorResult([saved.error])
+      return jsonResult({
+        ok: true,
+        marketData,
+        comparison: compareMarket(marketData),
+        updatedAt: saved.value.updatedAt,
+      })
     }
   )
 

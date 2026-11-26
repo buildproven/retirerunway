@@ -55,6 +55,11 @@ const complete: UserProfile = {
   annualContributions: 40_000,
   withdrawalTaxRate: 0.1,
   spendingPhases: [{ startAge: 60, annualExpenses: 128_000 }],
+  marketData: {
+    asOfDate: new Date().toISOString().slice(0, 10),
+    treasury10y: 0.05,
+    tipsReal10y: 0.029,
+  },
 }
 
 interface Briefing {
@@ -345,7 +350,9 @@ describe('REQ-MCP-37: get_briefing order, fixes, next actions and version', () =
     const bare = await briefing()
     expect(bare.checks.missing.length).toBeGreaterThan(1)
     for (const item of bare.checks.missing) {
-      expect(item.fixWith).toMatch(/^(save_profile|import_positions)$/)
+      expect(item.fixWith).toMatch(
+        /^(save_profile|import_positions|save_market_data)$/
+      )
     }
   })
 
@@ -365,6 +372,31 @@ describe('REQ-MCP-37: get_briefing order, fixes, next actions and version', () =
     const b = await briefing()
     expect(b.checks.warnings).toHaveLength(1)
     expect(b.checks.warnings[0].fixWith).toBe('save_profile')
+  })
+
+  it('REQ-MCP-75 saves market data, compares it with stocks, and warns when it is stale', async () => {
+    await call('save_profile', { profile: complete })
+    const saved = (await call('save_market_data', {
+      marketData: {
+        asOfDate: '2026-01-02',
+        treasury10y: 0.05,
+        tipsReal10y: 0.029,
+        stockForecasts: [{ source: 'Firm', asOf: '2025-12-31', mean: 0.045 }],
+        sources: ['test'],
+      },
+    })) as { content: { text: string }[]; isError?: boolean }
+    expect(saved.isError).not.toBe(true)
+    const result = JSON.parse(saved.content[0].text) as {
+      comparison: { equityPremiumOverTips: number }
+    }
+    expect(result.comparison.equityPremiumOverTips).toBeCloseTo(-0.005, 6)
+    const b = await briefing()
+    const stale = b.checks.warnings.find(w => w.fixWith === 'save_market_data')
+    expect(stale?.message).toMatch(/^market data is from 2026-01-02/)
+    const bad = (await call('save_market_data', {
+      marketData: { asOfDate: 'today', treasury10y: 0.05 },
+    })) as { isError?: boolean }
+    expect(bad.isError).toBe(true)
   })
 
   it('REQ-MCP-37 lists every section in order, even when nothing is saved', async () => {

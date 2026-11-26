@@ -107,9 +107,18 @@ describe('Roth conversions in projectRetirement', () => {
     const twentyTwo = run({
       rothConversion: { kind: 'fillBracket', rate: 0.22 },
     })
-    expect(twentyTwo.expectedPath.lifetimeRothConversion).toBeGreaterThan(
-      twelve.expectedPath.lifetimeRothConversion
-    )
+    // Each year converts more, so the pre-tax money is gone sooner; the
+    // lifetime total can then be lower (less growth left to convert).
+    const at = (p: typeof twelve, age: number) =>
+      p.expectedPath.years.find(y => y.age === age)?.rothConversion ?? 0
+    for (const age of [60, 61, 63, 64, 65]) {
+      expect(at(twentyTwo, age)).toBeGreaterThan(at(twelve, age))
+    }
+    const emptyBy = (p: typeof twelve) =>
+      p.expectedPath.years.find(
+        y => y.age >= 60 && y.endBalances.employerPlan + y.endBalances.ira < 1
+      )?.age ?? Infinity
+    expect(emptyBy(twentyTwo)).toBeLessThan(emptyBy(twelve))
   })
 
   it('keeps ACA MAGI under the 400% line before 65 when told to', () => {
@@ -129,7 +138,7 @@ describe('Roth conversions in projectRetirement', () => {
     expect(r.expectedPath.lifetimeRothConversion).toBeGreaterThan(0)
     expect(r.expectedPath.years.every(y => y.irmaaTier === 0)).toBe(true)
     // The ceiling is real: some year converts right up to it.
-    expect(irmaaCeiling(0, 'married_filing_jointly')).toBe(218_000)
+    expect(irmaaCeiling(0, 'married_filing_jointly')).toBe(224_000)
   })
 
   it('pays the conversion tax from the portfolio, not from thin air', () => {

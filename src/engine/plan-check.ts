@@ -6,6 +6,7 @@
 import { CdLadderError, planCdLadder, type CdLadderPlan } from './cd-ladder'
 import { baseExpensesAt, isLiquidAccount } from './portfolio-math'
 import { glideShareAt } from './retirement-projection'
+import { rungCost, tipsGapYears } from './safe-ladder'
 import type {
   Account,
   AccountType,
@@ -640,12 +641,36 @@ export function checkPlan(
         })),
     ]
     const proceedsLater = upcomingCovered.flatMap(u => u.byAccount)
+    // REQ-MCP-76: a saved safe ladder in the same account sets each rung's
+    // target to that rung's cost today.
+    const safe =
+      profile.safeLadder !== undefined &&
+      profile.safeLadder.accountType === ladderRule.accountType
+        ? profile.safeLadder
+        : undefined
+    const asOfYear = Number(asOfDate.slice(0, 4))
+    const rungTargets =
+      safe === undefined
+        ? undefined
+        : new Map(
+            safe.rungs.map(rung => [
+              asOfYear + (Math.floor(rung.age) - profile.currentAge),
+              rungCost(rung, profile.currentAge),
+            ])
+          )
+    const gap = new Set(tipsGapYears(asOfDate))
+    const safeYield = (year: number) =>
+      safe?.rungs.find(
+        r => asOfYear + (Math.floor(r.age) - profile.currentAge) === year
+      )?.yield
     try {
       cdLadder = planCdLadder(portfolio, ladderRule, {
         asOfDate,
         saleProceedsNow: proceedsNow,
         saleProceedsLater: proceedsLater,
         quotes: rateQuotes,
+        ...(rungTargets === undefined ? {} : { rungTargets }),
+        ...(safe?.instrument === 'tips' ? { noIssuerLimit: true } : {}),
       })
     } catch (error) {
       if (error instanceof CdLadderError)
@@ -656,10 +681,18 @@ export function checkPlan(
       const plan = cdLadder
       const buys = plan.rungs.filter(rung => rung.buyNow > 0)
       const accountName = plan.accountName ?? plan.accountType
-      const label = (rung: (typeof buys)[number]) =>
-        rung.quote === null
+      const label = (rung: (typeof buys)[number]) => {
+        const tipsYield =
+          safe?.instrument === 'tips' ? safeYield(rung.year) : undefined
+        // REQ-MCP-87: no TIPS mature in a gap year until its January auction.
+        if (tipsYield !== undefined && gap.has(rung.year))
+          return `${rung.year} ${dollars(rung.buyNow)} (no TIPS mature in ${rung.year} yet: hold it in short Treasuries and buy the 10-year TIPS at the January ${rung.year - 10} auction)`
+        if (tipsYield !== undefined)
+          return `${rung.year} ${dollars(rung.buyNow)} (TIPS maturing ${rung.year}, ${(tipsYield * 100).toFixed(2)}% real)`
+        return rung.quote === null
           ? `${rung.year} ${dollars(rung.buyNow)} (${rung.termYears}-yr, no quote)`
           : `${rung.year} ${dollars(rung.buyNow)} (${rung.termYears}-yr ${rung.quote.kind === 'cd' ? 'call-protected CD' : 'Treasury'} ${(rung.quote.apy * 100).toFixed(2)}%)`
+      }
       const sources = [
         ...new Set(
           buys.flatMap(rung =>
@@ -675,13 +708,13 @@ export function checkPlan(
         amount: plan.buyNowTotal,
         trades: buys.map(rung => ({
           action: 'buy' as const,
-          symbol: `${rung.quote?.kind === 'treasury' ? 'TREASURY' : 'CD'} ${rung.year}`,
+          symbol: `${safe?.instrument === 'tips' ? 'TIPS' : rung.quote?.kind === 'treasury' ? 'TREASURY' : 'CD'} ${rung.year}`,
           accountName,
           accountType: plan.accountType,
           amount: rung.buyNow,
           estimatedTax: 0,
         })),
-        reason: `${dollars(plan.fundingNow)} ready in ${plan.accountType} (idle cash ${dollars(plan.idleCash)}${plan.fundingNow - plan.idleCash > 0.005 ? ` plus ${dollars(plan.fundingNow - plan.idleCash)} of sale proceeds` : ''}); each rung's target is ${dollars(plan.rungTarget)} of the ${dollars(plan.total)} ladder, earliest short rung first${sources.length > 0 ? `; quotes: ${sources.join('; ')}` : ''}${plan.notes.length > 0 ? `; ${plan.notes.join('; ')}` : ''}`,
+        reason: `${dollars(plan.fundingNow)} ready in ${plan.accountType} (idle cash ${dollars(plan.idleCash)}${plan.fundingNow - plan.idleCash > 0.005 ? ` plus ${dollars(plan.fundingNow - plan.idleCash)} of sale proceeds` : ''}); ${safe === undefined ? `each rung's target is ${dollars(plan.rungTarget)} of the ${dollars(plan.total)} ladder` : `each rung's target is its cost today in your saved ${safe.instrument === 'tips' ? 'TIPS' : 'CD'} safe ladder (${dollars(plan.total)} in all)`}, earliest short rung first${sources.length > 0 ? `; quotes: ${sources.join('; ')}` : ''}${plan.notes.length > 0 ? `; ${plan.notes.join('; ')}` : ''}`,
       })
     }
   }

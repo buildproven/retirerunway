@@ -4,6 +4,7 @@
 // All functions are pure and deterministic.
 // ---------------------------------------------------------------------------
 
+import { reverseMortgagePlan } from './reverse-mortgage'
 import type {
   AccountType,
   Portfolio,
@@ -31,7 +32,7 @@ export function calculatePortfolioValue(portfolio: Portfolio): number {
 
 /**
  * Computes the fraction of portfolio value held in equities.
- * Includes us_equity, intl_equity, and emerging_equity asset classes.
+ * Includes us_equity, intl_equity, emerging_equity and reit (REQ-MCP-78).
  */
 export function calculateEquityFraction(
   portfolio: Portfolio,
@@ -44,7 +45,9 @@ export function calculateEquityFraction(
       if (
         holding.assetClass === 'us_equity' ||
         holding.assetClass === 'intl_equity' ||
-        holding.assetClass === 'emerging_equity'
+        holding.assetClass === 'emerging_equity' ||
+        // REQ-MCP-78: REITs are stocks; gold and other alternatives are not bonds either.
+        holding.assetClass === 'reit'
       ) {
         equity += holding.currentValue
       }
@@ -270,9 +273,13 @@ export function mortgagePaymentEndAge(
 ): number | undefined {
   if (profile.mortgage?.monthlyPayment === undefined) return undefined
   const payoffAge = mortgagePayoffAge(profile, asOfDate)
-  const saleAge = profile.homeSale?.age
-  if (payoffAge === undefined) return saleAge
-  return saleAge === undefined ? payoffAge : Math.min(payoffAge, saleAge)
+  // REQ-MCP-86: a reverse mortgage pays the mortgage off when it opens.
+  const hecm = reverseMortgagePlan(profile, asOfDate)
+  const hecmAge = hecm?.opens === true ? hecm.openAge : undefined
+  const ends = [payoffAge, profile.homeSale?.age, hecmAge].filter(
+    (a): a is number => a !== undefined
+  )
+  return ends.length === 0 ? undefined : Math.min(...ends)
 }
 
 function calendarMonth(isoDate: string): number {

@@ -303,25 +303,27 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD')
 /** Upper bound on CSV text, so one call cannot stall the host. */
 export const MAX_CSV_CHARS = 2_000_000
 
+const ASSET_CLASSES = [
+  'us_equity',
+  'intl_equity',
+  'emerging_equity',
+  'us_bond',
+  'intl_bond',
+  'tips',
+  'money_market',
+  'cd',
+  'reit',
+  'commodity',
+  'crypto',
+  'cash',
+  'other',
+] as const
+
 const holdingSchema = z.strictObject({
   id: z.string(),
   symbol: z.string(),
   name: z.string(),
-  assetClass: z.enum([
-    'us_equity',
-    'intl_equity',
-    'emerging_equity',
-    'us_bond',
-    'intl_bond',
-    'tips',
-    'money_market',
-    'cd',
-    'reit',
-    'commodity',
-    'crypto',
-    'cash',
-    'other',
-  ]),
+  assetClass: z.enum(ASSET_CLASSES),
   shares: finite,
   costBasis: finite,
   currentPrice: finite,
@@ -428,11 +430,69 @@ export const rateQuoteSchema = z.strictObject({
   quotedOn: isoDate,
 })
 
+/** Dated market data (REQ-MCP-75): yields and stock forecasts with their sources. */
+export const marketDataSchema = z.strictObject({
+  asOfDate: isoDate,
+  treasury10y: finite.min(-0.02).max(0.2).optional(),
+  tipsReal10y: finite.min(-0.05).max(0.15).optional(),
+  cdYields: z
+    .array(
+      z.strictObject({
+        termYears: finite.min(0.25).max(30),
+        rate: finite.min(0).max(0.2),
+      })
+    )
+    .max(20)
+    .optional(),
+  stockForecasts: z
+    .array(
+      z.strictObject({
+        source: z.string().min(1).max(80),
+        asOf: isoDate,
+        mean: finite.min(-0.1).max(0.2),
+      })
+    )
+    .max(10)
+    .optional(),
+  // REQ-MCP-78: firms' 10-year forecasts by asset class.
+  assetForecasts: z
+    .array(
+      z.strictObject({
+        name: z.string().min(1).max(80),
+        assetClass: z.enum(ASSET_CLASSES),
+        mean: finite.min(-0.1).max(0.3),
+        volatility: finite.min(0).max(1).optional(),
+        source: z.string().min(1).max(80),
+        asOf: isoDate,
+      })
+    )
+    .max(40)
+    .optional(),
+  // REQ-MCP-80: lifetime income annuity payout quotes.
+  annuityQuotes: z
+    .array(
+      z.strictObject({
+        age: finite.min(40).max(95),
+        payoutRate: finite.min(0).max(0.3),
+        joint: z.boolean(),
+        source: z.string().min(1).max(80),
+        asOf: isoDate,
+      })
+    )
+    .max(20)
+    .optional(),
+  sources: z.array(z.string().min(1).max(300)).max(20).optional(),
+})
+
+// Whole-year ages: the projection steps one year at a time from currentAge
+// to planningAge, and RMDs, claiming ages and history look up whole ages.
+const wholeAge = z.number().int()
+
 export const userProfileSchema = z.strictObject({
-  currentAge: finite,
-  targetRetirementAge: finite,
+  currentAge: wholeAge,
+  targetRetirementAge: wholeAge,
   annualExpenses: finite,
-  socialSecurityAge: finite.optional(),
+  socialSecurityAge: wholeAge.optional(),
   socialSecurityMonthly: finite.optional(),
   pensionMonthly: finite.optional(),
   otherIncomeMonthly: finite.optional(),
@@ -462,14 +522,14 @@ export const userProfileSchema = z.strictObject({
   spendingPhases: z
     .array(
       z.strictObject({
-        startAge: finite,
+        startAge: wholeAge,
         annualExpenses: finite,
       })
     )
     .optional(),
   homeSale: z
     .strictObject({
-      age: finite,
+      age: wholeAge,
       salePrice: finite.optional(),
       sellingCostRate: finite.optional(),
       replacementHomeCost: finite.optional(),
@@ -479,12 +539,12 @@ export const userProfileSchema = z.strictObject({
   // Read by project_retirement only (REQ-MCP-39).
   spouse: z
     .strictObject({
-      currentAge: finite,
-      socialSecurityAge: finite.optional(),
+      currentAge: wholeAge,
+      socialSecurityAge: wholeAge.optional(),
       socialSecurityMonthly: finite.optional(),
     })
     .optional(),
-  planningAge: finite.optional(),
+  planningAge: wholeAge.optional(),
   filingStatus: z.enum(FILING_STATUSES).optional(),
   stateExemptsRetirementIncome: z.boolean().optional(),
   preMedicareHealthcare: finite.optional(),
@@ -507,6 +567,8 @@ export const userProfileSchema = z.strictObject({
       forecastSuccessRate: finite.min(0.3).max(0.99).optional(),
       latestAge: finite.min(40).max(80).optional(),
       reviewEveryDays: z.number().int().min(7).max(366).optional(),
+      // REQ-MCP-77: apply the engine's proposed rules at each review.
+      autoApplyRules: z.boolean().optional(),
     })
     .optional(),
   // REQ-MCP-71: stock share by age.
@@ -534,8 +596,51 @@ export const userProfileSchema = z.strictObject({
       bondMean: finite.min(-0.1).max(0.15).optional(),
       inflationMean: finite.min(-0.05).max(0.15).optional(),
       years: z.number().int().min(1).max(60).optional(),
+      // REQ-MCP-82: stock-bond return correlation in the Monte Carlo.
+      stockBondCorrelation: finite.min(-0.9).max(0.9).optional(),
     })
     .optional(),
+  // REQ-MCP-75: dated market data behind the forecast preset.
+  marketData: marketDataSchema.optional(),
+  // REQ-MCP-76: a held-to-maturity TIPS or CD ladder for the bridge years.
+  safeLadder: z
+    .strictObject({
+      instrument: z.enum(['tips', 'cd']),
+      accountType: z.enum(ACCOUNT_TYPES),
+      rungs: z
+        .array(
+          z.strictObject({
+            age: finite.min(18).max(110),
+            amount: finite.min(0).max(10_000_000),
+            yield: finite.min(-0.05).max(0.2),
+          })
+        )
+        .min(1)
+        .max(40),
+    })
+    .optional(),
+  // REQ-MCP-80: a lifetime income annuity bought from the portfolio.
+  incomeAnnuity: z
+    .strictObject({
+      purchaseAge: finite.min(40).max(95),
+      premium: finite.min(0).max(50_000_000),
+      payoutRate: finite.min(0).max(0.3),
+      accountType: z.enum(ACCOUNT_TYPES),
+      joint: z.boolean().optional(),
+    })
+    .optional(),
+  // REQ-MCP-81: health cover rising faster than prices.
+  healthcareRealGrowth: finite.min(-0.05).max(0.1).optional(),
+  // REQ-MCP-82: a long-term care need.
+  longTermCare: z
+    .strictObject({
+      startAge: wholeAge,
+      years: finite.min(0).max(30),
+      annualCost: finite.min(0).max(2_000_000),
+    })
+    .optional(),
+  // REQ-MCP-79: the card and loan APR.
+  consumerDebtRate: finite.min(0).max(0.6).optional(),
   // REQ-MCP-52: a gap in pay before retirement.
   incomeGap: z
     .strictObject({
@@ -545,6 +650,25 @@ export const userProfileSchema = z.strictObject({
       newAnnualContributions: finite.min(0).optional(),
       monthlySpending: finite.min(0).optional(),
       healthcareMonthly: finite.min(0).optional(),
+    })
+    .optional(),
+  // REQ-MCP-83: the federal marginal rate on pay while working.
+  workingMarginalRate: finite.min(0).max(0.37).optional(),
+  // REQ-MCP-83: a move to a new employer before retirement.
+  jobChange: z
+    .strictObject({
+      age: wholeAge,
+      oldPlan: z.enum(['rollIn', 'leave', 'ira']),
+      nqdcStartsAtChange: z.boolean().optional(),
+    })
+    .optional(),
+  // REQ-MCP-86: a reverse mortgage line as a standby.
+  reverseMortgage: z
+    .strictObject({
+      openAge: wholeAge,
+      principalLimitFactor: finite.min(0).max(0.9).optional(),
+      upfrontCostRate: finite.min(0).max(0.1).optional(),
+      growthRate: finite.min(0).max(0.15).optional(),
     })
     .optional(),
   // REQ-MCP-60: one-off after-tax money at an age, today's dollars.
@@ -790,6 +914,11 @@ export const updateProfileInput = z.strictObject({
 })
 
 export const noInput = z.strictObject({})
+
+// REQ-MCP-75: today's yields and stock forecasts, with their sources.
+export const saveMarketDataInput = z.strictObject({
+  marketData: marketDataSchema,
+})
 
 /** The longest notes text a store reads in one section (version 1 notes held up to this), in characters. */
 export const MAX_NOTES_LENGTH = 20_000

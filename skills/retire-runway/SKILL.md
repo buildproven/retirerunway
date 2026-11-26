@@ -150,6 +150,46 @@ last, the can-spend figure and the plan check. Lead with `verdict` and
 `headline`, then `reasons` and `actions` as written. The thresholds are in the
 result; say which one failed.
 
+## Current markets first: save_market_data
+
+Recommendations must follow today's markets, not the figures the app shipped
+with. Before any review, rule proposal or allocation advice, and in every
+scheduled run, check `marketData` on the profile (get_briefing warns when it is
+missing or over 35 days old). To refresh it, search for and read, each from a
+page that shows its own date:
+
+- the 10-year Treasury yield and the 10-year TIPS real yield (US Treasury,
+  FRED, or a recent auction result);
+- the best call-protected new-issue CD yields by term (the broker's CD page);
+- the firms' latest 10-year US stock return forecasts (for example Vanguard,
+  J.P. Morgan, BlackRock), each with its date;
+- the same firms' 10-year forecasts by asset class (`assetForecasts`): at
+  least US large cap, US value and growth where given, non-US developed,
+  emerging markets, REITs, gold, broad commodities, and core bonds, each
+  mapped to its holdings class.
+
+Call `save_market_data` with the figures as decimals and the sources. Lead
+with its `comparison.headline`: how much more stocks are expected to pay than
+TIPS after inflation. Then show `comparison.assets` as a table (asset,
+forecast, real, premium over TIPS, reward per risk, verdict): it is what
+each class is expected to pay for its risk against risk-free money today.
+`propose_plan_rules.altTest` says whether to hold more or less gold and
+other alternatives. Also save `annuityQuotes` (lifetime annuity payout
+rates by age, joint for a couple, from a broker's dated quote page) so
+`annuityTest` can test buying an income annuity at Social Security age.
+
+In every review also report `review_plan.debt` (pay off debt that costs
+more than safe money pays; keep debt that costs less) and
+`review_plan.stressTests` (health cover +2%/yr, stocks and bonds falling
+together, a long-term care need, a year out of work from 55, lump sums 20% lower):
+name the worst one and the lever that answers it. The ranked list of what the engine covers and
+what it does not is `docs/GAP-REVIEW.md`: name an uncovered risk that bears
+on the owner's question instead of implying the plan covers it. From then on every forecast-return run uses these
+figures (stocks at the forecasts' average, bonds at the Treasury yield,
+inflation at the breakeven), and `propose_plan_rules` and `review_plan` test
+locking the bridge years in a TIPS or CD ladder bought at these yields
+(`safeLadderTest`, `market`). Never type a figure from memory.
+
 ## The plan: review it, refine it, keep it current (review_plan)
 
 The goal is to retire as early as is safe. The plan of record is the saved
@@ -167,8 +207,12 @@ items) and the latest `review_plan`. Keep it current with the owner:
    change the profile to match (a spending cut in `spendingPhases`, part-time
    income in `otherIncomeMonthly` with start and end ages, a home sale in
    `homeSale`, a new target in `targetRetirementAge`) and save it with
-   `save_profile` once the owner says yes. For rule changes, follow
-   propose_plan_rules below. For goals ("I want 80% to be safe enough", "review
+   `save_profile` once the owner says yes. For rule changes: when
+   `rules.mode` is `auto` (profile `goals.autoApplyRules`), the review
+   already stands on the proposed rules; save `rules.proposedRules` (as
+   `planRules`), `rules.safeLadder` (as `safeLadder`) and `rules.glidePath`
+   with `update_profile`, then tell the owner what changed and why, from
+   `rules.findings`. Otherwise follow propose_plan_rules below. For goals ("I want 80% to be safe enough", "review
    every two weeks"), save `goals`.
 3. Record each decision, with its date and reason, in the `decisions` notes
    section, and open questions in `openItems`, with `save_plan_notes`.
@@ -194,18 +238,25 @@ owner asks to set or review them, after a big change (a new snapshot after
 trades, a new retirement age, a home sale), and when plan_check's advice looks
 wrong for the plan.
 
-1. Lead with `changes` and the stock-share test: show `equityTest.rows` as a
+1. Lead with `market.headline` (safe yields against the stock forecasts),
+   then `changes` and the stock-share test: show `equityTest.rows` as a
    table (share, success rate, forecast success rate) and say which share it
-   proposes and why, from `equityTest.basis`.
+   proposes and why, from `equityTest.basis`. Then show `safeLadderTest.rows`
+   (ladder, ages, cost, stock share of the rest and overall, success rates)
+   and its `basis`: whether locking the bridge years at today's yields beats
+   holding more stocks.
 2. Then each finding, one at a time: the rule, its current value, the
    proposed value and the reason, as written. For the ladder, list the rungs
    (year, age, amount, buyable now or later, penalty) and the notes.
 3. Ask the owner to approve or decline each change and addition, and to give
    each value marked needs input (bank savings for `outsideCash`).
-4. Save only what the owner approved: start from the saved `planRules`, apply
-   the approved changes from `proposedRules`, and call `save_profile` with the
-   whole profile. Never save a rule the owner has not approved, and never
-   save from a scheduled run.
+4. When profile `goals.autoApplyRules` is true, the rules are the system's
+   working settings, not the owner's commitments: save `proposedRules` as
+   `planRules`, and `safeLadderTest.proposed` as `safeLadder` when a
+   `safeLadder` finding is a change, with `update_profile`, and say what
+   changed. Otherwise save only what the owner approved: start from the saved
+   `planRules`, apply the approved changes from `proposedRules`, and call
+   `update_profile`. Trades and purchases always stay the owner's.
 5. Then run `plan_check` with today's date so the owner sees the trades the
    new rules call for.
 
@@ -313,10 +364,14 @@ Roth share at the planning age), then the yearly amounts from its
 ## Runway check run (monthly scheduled task)
 
 The scheduled runway check runs this section with nobody watching. Ask
-nothing. Never trade, never change the saved profile, and write only the
-`agentLog` notes section. Every number comes from a tool result.
+nothing. Never trade. Change the saved profile only to save market data and,
+when `goals.autoApplyRules` is true, the engine's working settings (step 5);
+write only the `agentLog` notes section. Every number comes from a tool
+result or a dated source page.
 
-1. Call `get_briefing`. Note its warnings and the newest snapshot date.
+1. Call `get_briefing`. Note its warnings and the newest snapshot date. Then
+   refresh the market data as in "Current markets first" and save it with
+   `save_market_data`; put its `comparison.headline` in the brief.
 2. If the newest snapshot is more than 35 days old and a Gmail connector is
    connected, find the newest positions CSV the owner emailed to themselves
    (`from:me has:attachment filename:csv (positions OR portfolio)`), newer
@@ -335,8 +390,12 @@ nothing. Never trade, never change the saved profile, and write only the
 5. Call `review_plan` with `asOfDate` set to today; the brief opens with its
    `headline` (verdict, when the owner can retire, the best levers). Add one
    line per item of `dataToRefresh`, the count of `ownerDecisions` ("<n>
-   decisions waiting: review in a chat"), and the `nextReviewDate`. Never act
-   on a lever or rule change: the owner decides in a chat.
+   decisions waiting: review in a chat"), and the `nextReviewDate`. When
+   `rules.mode` is `auto` and `rules.findings` is not empty, save
+   `rules.proposedRules`, `rules.safeLadder` and `rules.glidePath` (those not
+   null) with `update_profile`, and add one line per finding ("<rule>:
+   <current> -> <proposed>, <short reason>"): these are the changed
+   recommendations. Never act on a lever: the owner decides in a chat.
 6. Call `plan_check` with `asOfDate` set to today.
    When `planRules.cdLadder` is saved, first read current yields from a page
    that shows its own as-of date (the broker's new-issue CD and Treasury
@@ -522,6 +581,9 @@ server):
 
 - `get_briefing`: checks, profile, newest snapshots, plan notes by section,
   next actions and the server version in one call.
+- `save_market_data`: today's Treasury, TIPS and CD yields and the firms'
+  stock forecasts, with sources; every forecast run and the safe-ladder test
+  use them.
 - `save_profile`: store the user's profile after a validation pass.
 - `save_plan_notes`: replace one section of the plan notes (decisions,
   scenarios, confirmed figures, open items, agent log), checked against its
